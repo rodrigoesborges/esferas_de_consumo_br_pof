@@ -24,12 +24,37 @@ paseado nas POFs de 2002/3, 2008/9 e 2017/8
 
 Até o momento o projeto está organizado assim:
 
-> .  
+> ./  
 |  
 |--- 00_funcoes.R  
 |--- 01_rend_resp.R  
+|--- ...
+|--- 98_download_leitura_2009.R  
+|--- 99_pof2009.R  
 
 
 Os scripts estão numerados na ordem em que devem ser rodados.
+
+```{r}
+# Isso não é boa prática, depois transformamos em pacote
+source("00_funcoes.R")
+# Funções carregadas
+ls()
+
+t0 <- Sys.time()
+source("01_rend_desp.R")
+Sys.time() - t0
+# tabelas carregadas
+ls()
+```
+
+Ainda tem alguns arquivos ao final (98 e 99) em caráter preliminar
+(até por isso essa numeração).
+O que eles fazem é reproduzir o trabalho de 2016.
+
+
+
+
+
 
 
