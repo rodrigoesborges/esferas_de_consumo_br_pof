@@ -234,9 +234,193 @@ allRows <- map_df(tabela$cod_novo,
        domicilios_trabalhadores,
        allincomes , 
        componentes)
+
 # merge on the descriptions
 result_2.1.1 <- left_join( tabela, allRows, by = "cod_novo")
 
-# take a look at the final table..
-#result_2.1.1
-# ..or export them using one of the techniques discussed on http://twotorials.com
+# Gastos
+cad_desp <- readRDS("dados/2003/t_caderneta_despesa.rds")
+
+desp_90d <- readRDS("dados/2003/t_despesa_90dias.rds")
+
+desp_12m <- readRDS("dados/2003/t_despesa_12meses.rds")
+
+desp_veic <- readRDS("dados/2003/t_despesa_veiculo.rds")
+
+despesa <- readRDS("dados/2003/t_despesa.rds")
+
+despesa_esp <- readRDS("dados/2003/t_despesa_esp.rds")
+
+# Carrega tabela que traduz itens POF --> SCN
+tf <- tempfile()
+"https://github.com/rodrigoesborges/pofesferas/blob/master/tradutores/Tradu_POF_2003xContas-rearrumado-na-mao.xls?raw=true" %>% 
+  download.file(tf)
+tradutor <- readxl::read_excel(tf, skip = 1)
+
+
+componentes <- read_csv("https://raw.githubusercontent.com/rodrigoesborges/pofesferas/master/tradutores/cod68X20componentes-HIERARQ.csv")
+
+# Definimos função para recodificar, recalcular e selecionar apenas dados necessários para as próximas fases
+recod.despesas <- function (tabela, n.cod.qd) {
+  tabela %>% 
+    mutate(
+      codigo = {{n.cod.qd}} * 100000 + item,
+      despmes = val_def_anual / deflator / 12 ,
+      cod_uc = paste0(uf , seq , dv , domcl , uc) 
+    ) %>% 
+    group_by(cod_uc, codigo, fator) %>% 
+    summarise(despmes = sum(despmes)) %>% 
+    ungroup()
+}
+
+despesas_mensais_col <- recod.despesas(cad_desp, n.cod.qd = grupo)
+
+despesas_mensais_ind <- recod.despesas(despesa, quadro)
+
+despesas_90 <- recod.despesas(desp_90d, quadro)
+
+despesas_veic <- recod.despesas(desp_veic, quadro)
+
+despesas_12m <- recod.despesas(desp_12m, quadro)
+
+despesas_esp <- recod.despesas(despesa_esp, quadro)
+
+totais_despesas <- bind_rows(
+  despesas_mensais_col,
+  despesas_mensais_ind,
+  despesas_90,
+  despesas_veic,
+  despesas_12m,
+  despesas_esp
+)
+
+# algumas recodificações e enxugamento dos dicionários de tradução
+#tradutor$'Cod Pof' <- str_sub(tradutor$'Cod Pof' , 1 , 5) 
+tradutor <- tradutor %>% 
+  rename(codigo = 1) %>% 
+  filter(!duplicated(codigo)) %>% 
+  mutate(codigo = as.numeric(codigo))
+
+warning("Não entendi o que rolou aqui. Código não roda")
+warning("Temos que entender melhor o que queriamos aqui, tá meio jogado")
+# trad.agregado <- tradutor
+trad.agregado <- componentes
+# trad.agregado[trad.agregado=="", ] <- NA
+trad.agregado <- trad.agregado[complete.cases(trad.agregado), c(1,4)]
+
+#merge dos gastos
+gastos_SCN <- totais_despesas %>% 
+  left_join(tradutor, by = "codigo") %>% 
+  filter(complete.cases(.)) %>% 
+  mutate(cod68 = substr(CodAdapt , 1 , 4)) %>% 
+  left_join(trad.agregado, by = "cod68") 
+
+###################### Função que gera as estimativas para cada item - semi adaptado ------------
+cesta_esferas <- function(curCode ,
+                          family.level.income = domicilios_trabalhadores ,
+                          gastos_SCN = gastos_SCN ,
+                          componentes = componentes 
+                          #poststr = poststr
+                          ) {
+    curCode.plus.subcodes <- componentes %>% 
+      filter(substring(item68x20, 1, nchar(curCode)) == curCode) %>% 
+      pull(item68x20) 
+    
+    family.expenditures.by.code <- gastos_SCN %>% 
+      filter(item68x20 %in% curCode.plus.subcodes) %>% 
+      select(item68x20, despmes, cod_uc)
+    
+    family.level.spending <- family.expenditures.by.code %>% 
+      group_by(cod_uc) %>% 
+      summarise(despmes = sum(despmes))
+    
+    y <- family.level.income %>% 
+      left_join(family.level.spending)
+    
+    y[ is.na( y$despmes ) , 'despmes' ] <- 0
+    
+    z <- y %>% 
+      left_join(
+        unique(select(totais_despesas, cod_uc, fator)), 
+        by = "cod_uc"
+      ) %>% 
+      filter(!is.na(fator))
+    
+    sample.pof <- survey::svydesign(
+        id = ~control , 
+        #strata = ~estrato_unico , 
+        weights = ~fator ,
+        data = z , 
+        nest = TRUE
+      )
+    
+    #  uc.totals <- 
+    #    data.frame(
+    #      pos_estrato = unique( z$pos_estrato ) , 
+    #      Freq = unique( z$tot_unidade_c )
+    #    )
+    
+    warning("pensar por trocamos `postStratify` por `sample.pof`.")
+    pof.design <- sample.pof
+    # postStratify(
+    #   sample.pof , 
+    #   ~pos_estrato , 
+    #   uc.totals
+    # )
+    # 
+    st <- survey::svymean( ~despmes , pof.design )
+    
+    sb <- survey::svyby(
+        ~despmes , 
+        ~trabalhador.cat , 
+        pof.design , 
+        survey::svymean
+      )
+    
+    ot <-
+      data.frame( 
+        trabalhador.cat = 'Total' , 
+        mean = coef( st ) , 
+        se = as.numeric( survey::SE( st ) ) , 
+        cv = as.numeric( survey::cv( st ) )
+      )
+    
+    ob <-
+      data.frame( 
+        trabalhador.cat = sb$trabalhador.cat , 
+        mean = coef( sb ) , 
+        se = as.numeric( survey::SE( sb ) ) , 
+        cv = as.numeric( survey::cv( sb ) )
+      )
+    
+    w <- rbind( ot , ob )
+    
+    w$item68x20 <- curCode
+    
+    reshape( 
+      w , 
+      idvar = 'item68x20' ,
+      timevar = 'trabalhador.cat' ,
+      direction = 'wide'
+    )
+  }
+
+#### Gera a tabela final efetiva --------
+# Ver Itens SCN sem registro de Gasto
+tabelar <- componentes %>% 
+  filter(!item68x20 %in% gastos_SCN$item68x20)
+
+tabela <- tibble(
+  num.despesa = ifelse(!componentes$item68x20 %in% tabelar$item68x20, 
+         componentes$item68x20, NA),
+  setor = ifelse(!componentes$item68x20 %in% tabelar$item68x20, 
+         componentes$descrição, NA)
+) %>% filter(!is.na(setor))
+
+allRows <- map_df(tabela$num.despesa, 
+                  cesta_esferas,
+                  domicilios_trabalhadores ,
+                  gastos_SCN , componentes #, poststr 
+)
+
+res_cesta_esferas <- left_join( componentes , allRows)
