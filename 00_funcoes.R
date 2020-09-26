@@ -1,3 +1,9 @@
+subst_na <-  function(x) {
+  x[is.na(x)] <- 0
+  x
+}
+
+
 ler_rendimentos2018 <- function() {
   morador_uc <- ler_morador(2018) %>%
     select(UF, ESTRATO_POF, TIPO_SITUACAO_REG,
