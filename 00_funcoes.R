@@ -222,3 +222,21 @@ ler_despesas2018 <- function() {
   
   merge1
 }
+
+instrucoes_sas <- function(caminho) {
+  leitura_con <- file( caminho , encoding = 'windows-1252' )
+  
+  z <- readLines( leitura_con ) %>% 
+    stringr::str_replace_all( "\t" , " " )
+  
+  # remove lines containing the `if reg=__ then do;` pattern
+  z <- z[ !grepl( 'if reg=.* then do;' , z ) ] %>% 
+    stringr::str_replace_all( "@;" , "") %>% 
+    stringr::str_replace_all( "/;" , "/")
+  
+  # remove lines containing solely `input`
+  z <- z[ !( tolower( z ) == 'input' ) ]
+  
+  # remove the (SAScii-breaking) overlapping `controle` columns
+  z[ !grepl( "@3 controle 6." , z , fixed = TRUE ) ]
+}

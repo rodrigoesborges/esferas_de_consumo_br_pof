@@ -3,27 +3,14 @@ pof::unzip_pof(2009)
 
 # unzip_warn_fail <- function( ... ) tryCatch( { unzip( ... ) } , warning = function( w ) stop( conditionMessage( w ) ) )
 library(lodown)
+library(tidyverse)
 
 # Leituras baseadas no lodown
 # extract the leitura file containing the sas importation instructions
 files <- dir(path = "dados/2009/", recursive = T, full.names = T)
 leitura <- files[ grep( 'leitura' , tolower( files ) ) ]
 
-leitura_con <- file( leitura , encoding = 'windows-1252' )
-
-z <- readLines( leitura_con ) %>% 
-  str_replace_all( "\t" , " " )
-
-# remove lines containing the `if reg=__ then do;` pattern
-z <- z[ !grepl( 'if reg=.* then do;' , z ) ] %>% 
-  str_replace_all( "@;" , "") %>% 
-  str_replace_all( "/;" , "/")
-
-# remove lines containing solely `input`
-z <- z[ !( tolower( z ) == 'input' ) ]
-
-# remove the (SAScii-breaking) overlapping `controle` columns
-z <- z[ !grepl( "@3 controle 6." , z , fixed = TRUE ) ]
+z <- instrucoes_sas(leitura)
 
 # write the file back to your second temporary file
 tf2 <- tempfile()
@@ -51,8 +38,7 @@ data.files.to.import <- substr(z[ all.beginlines ],
 
 all.file.basenames <- basename(files) %>% 
   strsplit('.' , fixed = TRUE) %>% 
-  lapply('[[' , 1) %>% 
-  unlist()
+  map_chr(`[[` , 1)
 
 # Depois tirar desse loop e separar cada arquivo em uma função
 for ( dfn in data.files.to.import ){
