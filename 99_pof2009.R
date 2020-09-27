@@ -40,7 +40,6 @@ rendimentos_recoded <- rendimentos %>%
   left_join(incomeRecodesX, by = "cod_rec") %>% 
   select(cod_rec, cod_uc, recmes, fator_expansao1, fator_expansao2, cod_novo)
 
-
 outros_reci_recoded <- outros_reci %>% 
   mutate(
     recmes = ( valor_anual_expandido2 / fator_expansao2 ) / 12,
@@ -68,11 +67,6 @@ domicilios_porcodigo <- allincomes %>%
 domicilios_porcodigo_agregados <- domicilios_porcodigo %>% 
   group_by(cod_uc, cod_novo) %>% 
   summarise(recmes = sum(recmes))
-
-subst_na <-  function(x) {
-  x[is.na(x)] <- 0
-  x
-}
 
 renda_m_total <- domicilios_porcodigo_agregados %>% 
   group_by(cod_uc) %>%

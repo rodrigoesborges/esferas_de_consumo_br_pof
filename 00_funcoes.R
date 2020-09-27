@@ -1,9 +1,417 @@
+# ----- Auxiliares ------------------------------------------------------------
 subst_na <-  function(x) {
   x[is.na(x)] <- 0
   x
 }
 
+# ----- POF 2003 --------------------------------------------------------------
+ler_rendimentos2003 <- function() {
+  nomes <- c("morador", "domicilio", "rendimentos", "outros_reci")
+  arqs <- glue::glue(
+    "dados/2003/t_{nomes}.rds"
+  )
+  if (any(!file.exists(arqs))) {
+    stop("Os arquivos necessários para rodar esse scripts\n",
+         "são criados no script '96_download_leitura_2003.R'.\n",
+         "Rode ele para poder executar essa função.", 
+         call. = FALSE)
+  }
+  
+  domicilio <- readRDS( "dados/2003/t_domicilio.rds" ) %>% 
+    as_tibble()
+  
+  rendimentos <- readRDS("dados/2003/t_rendimentos.rds") %>% 
+    as_tibble()
+  
+  outros_reci <- readRDS("dados/2003/t_outros_reci.rds") %>% 
+    as_tibble()
+  
+  # use old translator for generating same table as 2008-09 script
+  tabelagregada <- "https://raw.githubusercontent.com/rodrigoesborges/pofesferas/master/tradutores/codigos-recodificacao-rendimentos.csv" %>% 
+    read_csv2() %>% 
+    set_names(c("cod_novo","tipoderendimento","cod_rec"))
+  
+  # Do some recodes
+  t_domicilio <- domicilio %>% 
+    mutate(estrato_unico = uf*100 + estrato)
+  
+  incomeRecodesX <- read_csv("https://raw.githubusercontent.com/rodrigoesborges/pofesferas/master/tradutores/tradutor-detalhado2003-reag.csv") %>% 
+    rename(cod_novo = cod.novo, cod_rec = cod.rec)
+  
+  t_rendimentos <- rendimentos %>% 
+    mutate(recmes = rend_def_anual / deflator / 12 ,
+           cod_uc = paste0( uf , seq , dv , domcl , uc ),
+           cod_rec = quadro * 1000 + pos_ocup
+    )
+  
+  
+  t_rendimentos_recoded <- t_rendimentos %>% 
+    left_join(incomeRecodesX, by = "cod_rec") %>% 
+    select(cod_rec, cod_uc, recmes, fator_set, fator, cod_novo)
+  
+  
+  t_outros_reci <- outros_reci %>% 
+    mutate(
+      recmes = rend_def_anual / deflator / 12 ,
+      cod_uc = paste0( uf , seq , dv , domcl , uc ),
+      cod_rec = quadro*1000+ floor(item/100)
+    )
+  
+  t_outros_reci_recoded <- t_outros_reci %>% 
+    left_join(incomeRecodesX, by = "cod_rec") %>% 
+    select(cod_rec, cod_uc, recmes, fator_set, fator, cod_novo )
+  
+  rbind(t_rendimentos_recoded, t_outros_reci_recoded)
+}
 
+classificar_rendimentos2003 <- function(df) {
+  morador <- readRDS("dados/2003/t_morador.rds") %>% 
+    as_tibble()
+  
+  t_morador <- morador %>% 
+    mutate(cod_uc = paste0( uf , seq , dv , domcl , uc ) )
+  
+  domicilio_rendas <- t_morador[ , c( 'cod_uc' , 'renda' ) ] %>% 
+    unique()
+  
+  componentes <- incomeRecodesX %>% 
+    set_names(c("cod_novo","tipoderendimento","cod_rec"))
+  
+  # Now we generate the vector that will be used as base for our aggregation criteria
+  # First we take (in fixed form) all items / subcodes
+  todos.subcodigos.tiporenda <- componentes %>% 
+    filter(substring(cod_novo,1, 1) == 1) %>% 
+    select(cod_novo)
+  
+  # next we aggregate by family/household the recoded income data
+  domicilios_porcodigo <- df %>% 
+    filter(cod_novo %in% todos.subcodigos.tiporenda$cod_novo) %>% 
+    select(cod_novo, recmes, cod_uc)
+  
+  domicilios_porcodigo_agregados <- domicilios_porcodigo %>% 
+    dplyr::mutate(nivel = stringr::str_remove_all(cod_novo, "\\.") %>% 
+                    as.numeric() ) %>% 
+    dplyr::group_by(cod_uc, nivel) %>% 
+    dplyr::summarise(recmes = sum(recmes))
+  
+  domicilios_porcodigo_agregados %>%
+    dplyr::mutate(forma = dplyr::case_when(
+      nivel == 111 ~ "cv", # empregado mas sem informação da v5302
+      nivel == 112 ~ "mv", # empregador
+      nivel == 121 ~ "cv", # INSS
+      nivel == 122 ~ "cv", # previdencia pública
+      nivel == 123 ~ "mv", # previdencia privada
+      nivel == 124 ~ "cv", # programas sociais
+      nivel == 13 ~ "mv", # aluguel
+      nivel == 14 ~ "mv", # outras rendas (morador ausente, menor de 10,
+      # indenização judicial, acoes, juros, outros)
+      
+      # Deixei esses casos por ultimo por sao casos para pensarmos
+      nivel == 113 ~ "cp", # conta própria
+      nivel == 125 ~ "cv", # pensao alimenticia, mesada, etc ?
+      nivel == 126 ~ "cv", # outras transferências
+      TRUE ~ NA_character_,
+    ),
+    # Esses 2.000 vieram da análise de Kmeans
+    # das rendas de conta-própria com 2 núcleos
+    # foi excluido um outlier de 400.000
+    forma = ifelse(forma != "cp", forma, 
+                   ifelse(recmes > 2000, "mv", "cv"))
+    )
+}
+
+ler_despesas2003 <- function() {
+  nomes <- c("caderneta_despesa", "despesa_90dias", "despesa_12meses", 
+             "despesa_veiculo",  "despesa", "despesa_esp")
+  arqs <- glue::glue(
+    "dados/2003/t_{nomes}.rds"
+  )
+  if (any(!file.exists(arqs))) {
+    stop("Os arquivos necessários para rodar esse scripts\n",
+         "são criados no script '96_download_leitura_2003.R'.\n",
+         "Rode ele para poder executar essa função.", 
+         call. = FALSE)
+  }
+  cad_desp <- readRDS("dados/2003/t_caderneta_despesa.rds")
+  
+  desp_90d <- readRDS("dados/2003/t_despesa_90dias.rds")
+  
+  desp_12m <- readRDS("dados/2003/t_despesa_12meses.rds")
+  
+  desp_veic <- readRDS("dados/2003/t_despesa_veiculo.rds")
+  
+  despesa <- readRDS("dados/2003/t_despesa.rds")
+  
+  despesa_esp <- readRDS("dados/2003/t_despesa_esp.rds")
+  
+  # Carrega tabela que traduz itens POF --> SCN
+  tf <- tempfile()
+  "https://github.com/rodrigoesborges/pofesferas/blob/master/tradutores/Tradu_POF_2003xContas-rearrumado-na-mao.xls?raw=true" %>% 
+    download.file(tf)
+  tradutor <- readxl::read_excel(tf, skip = 1)
+  
+  componentes <- read_csv("https://raw.githubusercontent.com/rodrigoesborges/pofesferas/master/tradutores/cod68X20componentes-HIERARQ.csv")
+  
+  # Definimos função para recodificar, recalcular e selecionar apenas dados necessários para as próximas fases
+  recod.despesas <- function (tabela, n.cod.qd) {
+    tabela %>% 
+      mutate(
+        codigo = {{n.cod.qd}} * 100000 + item,
+        despmes = val_def_anual / deflator / 12 ,
+        cod_uc = paste0(uf , seq , dv , domcl , uc) 
+      ) %>% 
+      group_by(cod_uc, codigo, fator) %>% 
+      summarise(despmes = sum(despmes)) %>% 
+      ungroup()
+  }
+  
+  despesas_mensais_col <- recod.despesas(cad_desp, n.cod.qd = grupo)
+  
+  despesas_mensais_ind <- recod.despesas(despesa, quadro)
+  
+  despesas_90 <- recod.despesas(desp_90d, quadro)
+  
+  despesas_veic <- recod.despesas(desp_veic, quadro)
+  
+  despesas_12m <- recod.despesas(desp_12m, quadro)
+  
+  despesas_esp <- recod.despesas(despesa_esp, quadro)
+  
+  bind_rows(
+    despesas_mensais_col,
+    despesas_mensais_ind,
+    despesas_90,
+    despesas_veic,
+    despesas_12m,
+    despesas_esp
+  )
+}
+
+# ----- POF 2009 --------------------------------------------------------------
+ler_rendimentos2009 <- function() {
+  nomes <- c("morador", "domicilio", "rendimentos", "outros_reci")
+  arqs <- glue::glue(
+    "dados/2009/Dados/t_{nomes}_s.rds"
+  )
+  if (any(!file.exists(arqs))) {
+    stop("Os arquivos necessários para rodar esse scripts\n",
+         "são criados no script '98_download_leitura_2009.R'.\n",
+         "Rode ele para poder executar essa função.", 
+         call. = FALSE)
+  }
+  
+  domicilio <- readRDS("dados/2009/Dados/t_domicilio_s.rds") %>% 
+    tibble::as_tibble()
+  
+  rendimentos <- readRDS("dados/2009/Dados/t_rendimentos_s.rds") %>% 
+    tibble::as_tibble()
+  
+  outros_reci <- readRDS("dados/2009/Dados/t_outros_reci_s.rds") %>% 
+    tibble::as_tibble()
+  
+  poststr <- readxl::read_excel(
+    "dados/2009/documentacao/Pos_estratos_totais.xls"
+  )
+  
+  incomeRecodes <- "https://raw.githubusercontent.com/rodrigoesborges/pofesferas/master/tradutores/codigos-recodificacao-rendimentos.csv" %>% 
+    readr::read_csv2() %>% 
+    dplyr::mutate(cod.inc = gsub(".*\\+.*", "50000", cod.inc))
+  
+  componentes <- incomeRecodes %>% 
+    purrr::set_names(c("cod_novo","tipoderendimento","cod_rec"))
+  
+  incomeRecodesX <- incomeRecodes$numero %>% 
+    purrr::map2_df(incomeRecodes$cod.inc, ~{
+      cmd <- paste("c(", .y,")")
+      tibble::tibble(cod_novo = .x, 
+                     cod_rec = as.character(eval(parse(text = cmd))))
+    })
+  
+  rendimentos_recoded <- rendimentos %>% 
+    dplyr::mutate(
+      recmes = ( valor_anual_expandido2 / fator_expansao2 ) / 12,
+      cod_uc = paste0( cod_uf, num_seq, num_dv, cod_domc, num_uc ),
+      cod_rec = paste0( num_quadro, substr(cod_item,1,3))
+    ) %>% 
+    dplyr::left_join(incomeRecodesX, by = "cod_rec") %>% 
+    dplyr::select(cod_rec, cod_uc, recmes, fator_expansao1, fator_expansao2, cod_novo)
+  
+  # É aqui que precisamos mexer caso queramos incluir critérios do informantes
+  # setor que trabalho, profissao, etc
+  outros_reci_recoded <- outros_reci %>% 
+    dplyr::mutate(
+      recmes = ( valor_anual_expandido2 / fator_expansao2 ) / 12,
+      cod_uc = paste0( cod_uf, num_seq, num_dv, cod_domc, num_uc ),
+      cod_rec = paste0( num_quadro, substr(cod_item,1,3))
+    ) %>% 
+    dplyr::left_join(incomeRecodesX, by = "cod_rec") %>% 
+    dplyr::select(cod_rec, cod_uc, recmes, fator_expansao1, fator_expansao2, cod_novo)
+  
+  rendimentos_recoded %>% 
+    dplyr::bind_rows(outros_reci_recoded)
+}
+
+
+classificar_rendimentos2009 <- function(df) {
+  
+  morador <- readRDS("dados/2009/Dados/t_morador_s.rds") %>% 
+    tibble::as_tibble()
+  
+  componentes <- "https://raw.githubusercontent.com/rodrigoesborges/pofesferas/master/tradutores/codigos-recodificacao-rendimentos.csv" %>% 
+    readr::read_csv2() %>% 
+    dplyr::mutate(cod.inc = gsub(".*\\+.*", "50000", cod.inc)) %>% 
+    purrr::set_names(c("cod_novo","tipoderendimento","cod_rec"))
+  
+  domicilio_rendas <- morador %>% 
+    dplyr::mutate(cod_uc = paste0( cod_uf, num_seq, num_dv, cod_domc, num_uc )) %>% 
+    dplyr::select(cod_uc, renda_total) %>% 
+    unique()
+  
+  todos_subcodigos_tiporenda <- componentes %>% 
+    dplyr::filter(substring(cod_novo, 1, 1) == 1) %>% 
+    dplyr::pull('cod_novo')
+  
+  domicilios_porcodigo <- df %>% 
+    dplyr::filter(cod_novo %in% todos_subcodigos_tiporenda) %>% 
+    dplyr::select(cod_novo, recmes, cod_uc)
+  
+  domicilios_porcodigo_agregados <- domicilios_porcodigo %>% 
+    dplyr::group_by(cod_uc, nivel = cod_novo) %>% 
+    dplyr::summarise(recmes = sum(recmes))
+  
+  domicilios_porcodigo_agregados %>%
+    dplyr::mutate(forma = dplyr::case_when(
+      nivel == 111 ~ "cv", # empregado mas sem informação da v5302
+      nivel == 112 ~ "mv", # empregador
+      nivel == 121 ~ "cv", # INSS
+      nivel == 122 ~ "cv", # previdencia pública
+      nivel == 123 ~ "mv", # previdencia privada
+      nivel == 124 ~ "cv", # programas sociais
+      nivel == 13 ~ "mv", # aluguel
+      nivel == 14 ~ "mv", # outras rendas (morador ausente, menor de 10,
+      # indenização judicial, acoes, juros, outros)
+      
+      # Deixei esses casos por ultimo por sao casos para pensarmos
+      nivel == 113 ~ "cp", # conta própria
+      nivel == 125 ~ "cv", # pensao alimenticia, mesada, etc ?
+      nivel == 126 ~ "cv", # outras transferências
+      TRUE ~ NA_character_,
+    ),
+    # Esses dois 2.500 viram da análise de Kmeans
+    # das rendas de conta-própria com 2 núcleos
+    forma = ifelse(forma != "cp", forma, 
+                   ifelse(recmes > 2500, "mv", "cv"))
+    )
+
+  # renda_m_total <- domicilios_porcodigo_agregados %>% 
+  #   dplyr::group_by(cod_uc) %>%
+  #   dplyr::summarise(cod_novo = 1,
+  #             recmes = sum(recmes, na.rm = TRUE)) %>% 
+  #   dplyr::bind_rows(domicilios_porcodigo_agregados) %>% 
+  #   tidyr::spread(key = cod_novo, value = recmes) %>% 
+  #   purrr::map_dfc(subst_na)
+  # 
+  # # Aqui a gente define rendas do trabalho, etc
+  # renda_m <- renda_m_total %>% 
+  #   dplyr::mutate(renda_trabalho = ((`111` + `113` +
+  #                               `121` + `124` + 0.01 ) / 
+  #                              (`1`+ 0.01)) * 100) %>% 
+  #   dplyr::select(cod_uc, renda_trabalho)
+  # 
+  # domicilios_trabalhadores <- domicilio_rendas %>% 
+  #   dplyr::left_join(renda_m, by = "cod_uc")
+  # 
+  # # Aqui os NAs com baixa renda foram definidos como trabalhadores
+  # # De onde a gente tirou esses 2.000 mil reais?
+  # domicilios_trabalhadores[is.na(domicilios_trabalhadores$renda_trabalho) &
+  #                            domicilios_trabalhadores$renda_total <= 2000, "renda_trabalho"] <- 100
+  # 
+  # domicilios_trabalhadores[is.na(domicilios_trabalhadores$renda_trabalho) &
+  #                            domicilios_trabalhadores$renda_total > 2000, "renda_trabalho"] <- 0
+  # 
+  # # Aqui é estabelecido o critéiro de corte
+  # domicilios_trabalhadores %>% 
+  #   dplyr::mutate(
+  #     trabalhador.cat = cut(renda_trabalho, c( 0, 60, Inf ),
+  #                           include.lowest = TRUE, 
+  #                           labels = c( "Não Trabalhador", "Trabalhador" )),
+  #     control = substr(cod_uc, 1, 6 )
+  #   )  
+}
+
+ler_despesas2009 <- function() {
+  nomes <- c("caderneta_despesa", "despesa_individual", "despesa_90dias", 
+             "despesa_12meses", "despesa_veiculo")
+  arqs <- glue::glue(
+    "dados/2009/Dados/t_{nomes}_s.rds"
+  )
+  if (any(!file.exists(arqs))) {
+    stop("Os arquivos necessários para rodar esse scripts\n",
+         "são criados no script '98_download_leitura_2009.R'.\n",
+         "Rode ele para poder executar essa função.", 
+         call. = FALSE)
+  }
+  cad_desp <- readRDS("dados/2009/Dados/t_caderneta_despesa_s.rds") %>% 
+    as_tibble()
+  
+  desp_ind <- readRDS("dados/2009/Dados/t_despesa_individual_s.rds") %>% 
+    as_tibble()
+  
+  desp_90d <- readRDS("dados/2009/Dados/t_despesa_90dias_s.rds") %>% 
+    as_tibble()
+  
+  desp_12m <- readRDS("dados/2009/Dados/t_despesa_12meses_s.rds") %>% 
+    as_tibble()
+  
+  desp_veic <- readRDS("dados/2009/Dados/t_despesa_veiculo_s.rds") %>% 
+    as_tibble()
+  
+  # Carrega tabela que traduz itens POF --> SCN
+  tf <- tempfile()
+  "https://github.com/rodrigoesborges/pofesferas/blob/master/tradutores/Tradutor_POF2009_ContasNacionais.xls?raw=true" %>% 
+    download.file(tf)
+  tradutor <- readxl::read_excel(tf, sheet = 1 , skip = 1)
+  
+  # Tabela de componentes hierarquizada cod68 x cod 20 - dicionário de tradução agregado
+  componentes <- read_csv("https://raw.githubusercontent.com/rodrigoesborges/pofesferas/master/tradutores/cod68X20componentes-HIERARQ.csv")
+  
+  # Carrega tabela com códigos POF que não entram inicialmente como Consumo Final das Famílias
+  pofnaoconsumo <- read_csv("https://raw.githubusercontent.com/rodrigoesborges/pofesferas/master/tradutores/codigos_semtradutor.csv")
+  
+  # Definimos função para recodificar, recalcular e selecionar apenas dados necessários para as próximas fases
+  recod.despesas <- function (tabela, n.cod.qd, n.cod.it) { 
+    tabela <- tabela %>% 
+      # mutate(codigo = substr(paste0(eval(parse(text = n.cod.qd)), eval(parse(text = n.cod.it))) , 1 , 5) ,
+      mutate(codigo = substr(paste0({{n.cod.qd}}, {{n.cod.it}}) , 1 , 5) ,
+             despmes = ( valor_anual_expandido2 / fator_expansao2 / 12) ,
+             cod_uc = paste0(cod_uf , num_seq , num_dv , cod_domc , num_uc )
+      ) %>% 
+      select(cod_uc, codigo, despmes) %>% 
+      group_by(cod_uc, codigo) %>% 
+      summarise(despmes = sum(despmes)) %>% 
+      ungroup()
+  }
+  
+  despesas_mensais_col <- recod.despesas(cad_desp, n.cod.qd = prod_num_quadro_grupo_pro, n.cod.it = cod_item)
+  
+  despesas_mensais_ind <- recod.despesas(desp_ind, n.cod.qd = num_quadro, n.cod.it = cod_item)
+  
+  despesas_90 <- recod.despesas(desp_90d)
+  
+  despesas_veic <- recod.despesas(desp_veic)
+  
+  despesas_12m <- recod.despesas(desp_12m)
+  
+  bind_rows(
+    despesas_mensais_col,
+    despesas_mensais_ind,
+    despesas_90,
+    despesas_veic,
+    despesas_12m
+  )
+}
+
+# ----- POF 2018 --------------------------------------------------------------
 ler_rendimentos2018 <- function() {
   morador_uc <- ler_morador(2018) %>%
     select(UF, ESTRATO_POF, TIPO_SITUACAO_REG,
@@ -16,12 +424,12 @@ ler_rendimentos2018 <- function() {
   dic_rendimento <- ler_tradutor_rendimento(2018)
   
   dic2 <- dic_rendimento %>%
-    select(codigo, nivel = nivel_3, desc = descricao_3) %>%
-    filter(!is.na(nivel)) %>%
-    bind_rows(
+    dplyr::select(codigo, nivel = nivel_3, desc = descricao_3) %>%
+    dplyr::filter(!is.na(nivel)) %>%
+    dplyr::bind_rows(
       dic_rendimento %>%
-        filter(nivel_2 %in% c(13, 14)) %>%
-        select(codigo, nivel = nivel_2, desc = descricao_2)
+        dplyr::filter(nivel_2 %in% c(13, 14)) %>%
+        dplyr::select(codigo, nivel = nivel_2, desc = descricao_2)
     )
   
   rend_trabalho <- ler_rend_trab(2018) %>%
@@ -246,3 +654,4 @@ instrucoes_sas <- function(caminho) {
   # remove the (SAScii-breaking) overlapping `controle` columns
   z[ !grepl( "@3 controle 6." , z , fixed = TRUE ) ]
 }
+ 

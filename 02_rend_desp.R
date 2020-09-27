@@ -22,45 +22,47 @@ library(tidyverse)
 #   file.rename(str_remove(., "Arquivos de dados/"))
 
 # Etapa 1 -----------------------------------------------------------
-rendas2018 <- ler_rendimentos2018()
+rendas2009 <- ler_rendimentos2009()
 
 # Etapa 2 -----------------------------------------------------------
-rendas_classificadas <- classificar_rendimentos(rendas2018)
+rendas_classificadas2009 <- classificar_rendimentos2009(rendas2009)
 
-rendas_ucs <- rendas_classificadas %>%
-  group_by(cod_uc, forma) %>%
-  summarise(renda = sum(valor_mensal)) %>%
-  pivot_wider(names_from = forma, values_from = renda, 
+rendas_ucs2009 <- rendas_classificadas2009 %>%
+  dplyr::group_by(cod_uc, forma) %>%
+  dplyr::summarise(renda = sum(recmes)) %>%
+  tidyr::pivot_wider(names_from = forma, values_from = renda, 
               values_fill = list(renda = 0)) %>%
-  mutate(total = cv + mv,
-         p_cv = cv/total) %>%
-  ungroup()
+  dplyr::mutate(total = cv + mv,
+         p_cv = (cv + 0.01) / (total + 0.01)) %>%
+  dplyr::ungroup()
 
-# K-Means usadas para estabelecer corte alta/baixa
-# k_rendas <- kmeans(rendas_ucs$p_cv, c(0.2, 0.5))
+# # K-Means usadas para estabelecer corte alta/baixa
+# k_rendas <- kmeans(rendas_ucs2009$p_cv, c(0.2, 0.5))
 # k_rendas$centers
 # 
-# ggplot(rendas_ucs, aes(p_cv, total, col = factor(k_rendas$cluster))) +
+# ggplot(rendas_ucs2009, aes(p_cv, total, col = factor(k_rendas$cluster))) +
 #   geom_point(shape = ".", alpha = 0.5) +
-#   geom_vline(xintercept = 0.63, lty = 2) +
+#   geom_vline(xintercept = 0.6, lty = 2) +
 #   scale_y_continuous(limits = c(0, 20e3)) +
 #   theme_classic() +
 #   theme(legend.position = "none")
 
 # A análise acima propor o corte de 63% para esfera alta/baixa
-corte <- 0.63
+corte <- 0.6
 
 # Etapa 3 -----------------------------------------------------------
-rendas_esferas <- rendas_ucs %>%
+rendas_esferas2009 <- rendas_ucs2009 %>%
   mutate(esfera = ifelse(p_cv > corte, "baixa", "alta"))
-  
-esferas_ucs <- rendas_esferas %>%
+
+esferas_ucs2009 <- rendas_esferas2009 %>%
   select(cod_uc, esfera)
 
 # Etapa 4 -----------------------------------------------------------
-despesas_esferas <- ler_despesas2018() %>%
-  left_join(esferas_ucs, by = "cod_uc") %>% 
-  select(cod_uc, codigo, nivel_0:esfera)
+# Esse ano está sem os níveis, apenas código
+despesas_esferas <- ler_despesas2009() %>%
+  left_join(esferas_ucs2009, by = "cod_uc") %>% 
+  # select(cod_uc, codigo, nivel_0:esfera)
+  rename(valor = despmes)
 
 # Estimativa geral esferas
 despesas_esferas %>%
@@ -68,14 +70,7 @@ despesas_esferas %>%
   summarise(soma = sum(valor) * 12 / 1e9) %>% # Em bilhões
   mutate(partic = soma / sum(soma))
 
-# Estimativa um produto: livros (cod: 110803)
 despesas_esferas %>% 
-  group_by(nivel = nivel_4, esfera) %>%
-  summarise(soma = sum(valor) * 12 / 1e6)  %>%
-  filter(nivel == 110803) %>%
-  mutate(partic = soma / sum(soma))
+  mutate(ano = 2009) %>% 
+  write_csv("gastos_esferas_2009.csv")
 
-despesas_esferas %>% 
-  mutate(ano = 2018) %>% 
-  select(-starts_with("nivel")) %>% 
-  write_csv("gastos_esferas_2018.csv")
