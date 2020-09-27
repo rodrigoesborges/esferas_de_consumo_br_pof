@@ -28,14 +28,16 @@ Até o momento o projeto está organizado assim:
 |  
 |--- 00_funcoes.R  
 |--- 01_rend_resp.R  
-|--- ...
+|--- ...  
+|--- 96_download_leitura_2003.R  
+|--- 97_pof2003.R  
 |--- 98_download_leitura_2009.R  
 |--- 99_pof2009.R  
 
 
 Os scripts estão numerados na ordem em que devem ser rodados.
 
-```{r}
+```{r, cache = TRUE}
 # Isso não é boa prática, depois transformamos em pacote
 source("00_funcoes.R")
 # Funções carregadas

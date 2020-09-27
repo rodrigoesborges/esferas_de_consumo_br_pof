@@ -19,7 +19,10 @@ Até o momento o projeto está organizado assim:
 > |  
 > |— 00\_funcoes.R  
 > |— 01\_rend\_resp.R  
-> |— … |— 98\_download\_leitura\_2009.R  
+> |— …  
+> |— 96\_download\_leitura\_2003.R  
+> |— 97\_pof2003.R  
+> |— 98\_download\_leitura\_2009.R  
 > |— 99\_pof2009.R
 
 Os scripts estão numerados na ordem em que devem ser rodados.
@@ -30,7 +33,8 @@ source("00_funcoes.R")
 # Funções carregadas
 ls()
 #> [1] "classificar_rendimentos" "instrucoes_sas"         
-#> [3] "ler_despesas2018"        "ler_rendimentos2018"
+#> [3] "ler_despesas2018"        "ler_rendimentos2018"    
+#> [5] "subst_na"
 
 t0 <- Sys.time()
 source("01_rend_desp.R")
@@ -113,7 +117,7 @@ source("01_rend_desp.R")
 #> )
 #> See spec(...) for full column specifications.
 Sys.time() - t0
-#> Time difference of 1.710512 mins
+#> Time difference of 1.864457 mins
 # tabelas carregadas
 ls()
 #>  [1] "classificar_rendimentos" "corte"                  
@@ -121,7 +125,8 @@ ls()
 #>  [5] "instrucoes_sas"          "ler_despesas2018"       
 #>  [7] "ler_rendimentos2018"     "rendas_classificadas"   
 #>  [9] "rendas_esferas"          "rendas_ucs"             
-#> [11] "rendas2018"              "t0"
+#> [11] "rendas2018"              "subst_na"               
+#> [13] "t0"
 ```
 
 Ainda tem alguns arquivos ao final (98 e 99) em caráter preliminar (até
