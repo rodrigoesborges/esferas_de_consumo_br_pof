@@ -75,3 +75,7 @@ despesas_esferas %>%
   filter(nivel == 110803) %>%
   mutate(partic = soma / sum(soma))
 
+despesas_esferas %>% 
+  mutate(ano = 2018) %>% 
+  select(-starts_with("nivel")) %>% 
+  write_csv("gastos_esferas_2018.csv")
