@@ -48,7 +48,7 @@ rendas_ucs <- rendas_classificadas %>%
 #   theme(legend.position = "none")
 
 # A análise acima propor o corte de 63% para esfera alta/baixa
-corte <- 0.63
+corte <- 0.6
 
 # Etapa 3 -----------------------------------------------------------
 rendas_esferas <- rendas_ucs %>%

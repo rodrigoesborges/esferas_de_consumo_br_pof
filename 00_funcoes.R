@@ -462,42 +462,42 @@ ler_rendimentos2018 <- function() {
 }
 
 classificar_rendimentos <- function(df) {
-  junta_rendas <- df %>% 
+  # junta_rendas <- df %>% 
     # Os casos que caem com o filtro abaixo são movimentações 
     # financeiras que não sao renda
     # deposito de poupança, compra de ações, etc...
-    filter(!is.na(nivel)) %>%
-    mutate(forma = case_when(
-      # rendimento de empregado baseado no vínculo
-      nivel == 111 & v5302 == 1 ~ "cv",
-      nivel == 111 & v5302 == 2 ~ "mv",
-      nivel == 111 & v5302 == 3 ~ "cv",
-      # setor estatutário
-      nivel == 111 & v5302 == 4 & v5303 == 1 ~ "mv", 
-      # supoe não ter informalidade no setor publico
-      # trabalhador de estatal
-      nivel == 111 & v5302 == 4 & v5304 == 1 ~ "cv", 
-      # Tem casos (2491) de servidor sem carteria assinada ou estatuto. Pq?
-      nivel == 111 & v5302 == 4 ~ "mv", # caso acima
-      nivel == 111 & v5302 == 5 ~ "mv", # empregador
-      nivel == 111 & v5302 == 6 ~ "cp", # conta própria
-      nivel == 111 & v5302 == 7 ~ "cv", # trab não remunerado ?
-      nivel == 111 ~ "cv", # empregado mas sem informação da v5302
-      nivel == 112 ~ "mv", # empregador
-      nivel == 121 ~ "cv", # INSS
-      nivel == 122 ~ "cv", # previdencia pública
-      nivel == 123 ~ "mv", # previdencia privada
-      nivel == 124 ~ "cv", # programas sociais
-      nivel == 13 ~ "mv", # aluguel
-      nivel == 14 ~ "mv", # outras rendas (morador ausente, menor de 10,
-      # indenização judicial, acoes, juros, outros)
-      
-      # Deixei esses casos por ultimo por sao casos para pensarmos
-      nivel == 113 ~ "cp", # conta própria
-      nivel == 125 ~ "cv", # pensao alimenticia, mesada, etc ?
-      nivel == 126 ~ "cv", # outras transferências
-      TRUE ~ NA_character_,
-    ))
+    # filter(!is.na(nivel)) %>%
+    # mutate(forma = case_when(
+    #   # rendimento de empregado baseado no vínculo
+    #   nivel == 111 & v5302 == 1 ~ "cv",
+    #   nivel == 111 & v5302 == 2 ~ "mv",
+    #   nivel == 111 & v5302 == 3 ~ "cv",
+    #   # setor estatutário
+    #   nivel == 111 & v5302 == 4 & v5303 == 1 ~ "mv", 
+    #   # supoe não ter informalidade no setor publico
+    #   # trabalhador de estatal
+    #   nivel == 111 & v5302 == 4 & v5304 == 1 ~ "cv", 
+    #   # Tem casos (2491) de servidor sem carteria assinada ou estatuto. Pq?
+    #   nivel == 111 & v5302 == 4 ~ "mv", # caso acima
+    #   nivel == 111 & v5302 == 5 ~ "mv", # empregador
+    #   nivel == 111 & v5302 == 6 ~ "cp", # conta própria
+    #   nivel == 111 & v5302 == 7 ~ "cv", # trab não remunerado ?
+    #   nivel == 111 ~ "cv", # empregado mas sem informação da v5302
+    #   nivel == 112 ~ "mv", # empregador
+    #   nivel == 121 ~ "cv", # INSS
+    #   nivel == 122 ~ "cv", # previdencia pública
+    #   nivel == 123 ~ "mv", # previdencia privada
+    #   nivel == 124 ~ "cv", # programas sociais
+    #   nivel == 13 ~ "mv", # aluguel
+    #   nivel == 14 ~ "mv", # outras rendas (morador ausente, menor de 10,
+    #   # indenização judicial, acoes, juros, outros)
+    #   
+    #   # Deixei esses casos por ultimo por sao casos para pensarmos
+    #   nivel == 113 ~ "cp", # conta própria
+    #   nivel == 125 ~ "cv", # pensao alimenticia, mesada, etc ?
+    #   nivel == 126 ~ "cv", # outras transferências
+    #   TRUE ~ NA_character_,
+    # ))
   
   # O código abaixo foi usado para definir a renda dos conta-própria
   # que deve ser usada para classificar como baixa/alta
@@ -512,10 +512,35 @@ classificar_rendimentos <- function(df) {
   
   # algo semelhante pode ser feito para rendas dos empresários
   # para eliminar MEIs que contratam 1 pessoa
-  junta_rendas %>%
-    mutate(forma = ifelse(forma != "cp", forma,
-                          # valor usado vem do gráfico acima
-                          ifelse(valor_mensal > 6000, "mv", "cv")))
+  # junta_rendas %>%
+  #   mutate(forma = ifelse(forma != "cp", forma,
+  #                         # valor usado vem do gráfico acima
+  #                         ifelse(valor_mensal > 6000, "mv", "cv")))
+  
+  df %>% 
+    dplyr::filter(!is.na(nivel)) %>%
+    dplyr::mutate(forma = dplyr::case_when(
+    nivel == 111 ~ "cv", # empregado mas sem informação da v5302
+    nivel == 112 ~ "mv", # empregador
+    nivel == 121 ~ "cv", # INSS
+    nivel == 122 ~ "cv", # previdencia pública
+    nivel == 123 ~ "mv", # previdencia privada
+    nivel == 124 ~ "cv", # programas sociais
+    nivel == 13 ~ "mv", # aluguel
+    nivel == 14 ~ "mv", # outras rendas (morador ausente, menor de 10,
+    # indenização judicial, acoes, juros, outros)
+    
+    # Deixei esses casos por ultimo por sao casos para pensarmos
+    nivel == 113 ~ "cp", # conta própria
+    nivel == 125 ~ "cv", # pensao alimenticia, mesada, etc ?
+    nivel == 126 ~ "cv", # outras transferências
+    TRUE ~ NA_character_,
+  ),
+  # Esses dois 2.500 viram da análise de Kmeans
+  # das rendas de conta-própria com 2 núcleos
+  forma = ifelse(forma != "cp", forma, 
+                 ifelse(valor_mensal > 6000, "mv", "cv"))
+  )
 }
 
 ler_despesas2018 <- function() {
