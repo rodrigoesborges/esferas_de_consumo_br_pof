@@ -27,17 +27,18 @@ Até o momento o projeto está organizado assim:
 > ./  
 |  
 |--- 00_funcoes.R  
-|--- 01_rend_resp.R
+|--- 01_rend_resp.R  
 |--- 02_rend_resp.R  
 |--- 03_rend_resp.R  
+|--- 04_comparacoes.R  
 |--- ...  
 |--- 96_download_leitura_2003.R  
 |--- 97_pof2003.R  
 |--- 98_download_leitura_2009.R  
 |--- 99_pof2009.R  
 
-
-Os scripts estão numerados na ordem em que devem ser rodados.
+Os scripts estão numerados na ordem em que devem ser rodados 
+na verdade o `96` e o `98` tem que ser rodados antes do `02` e `03`.
 
 ```{r, cache = TRUE}
 # Isso não é boa prática, depois transformamos em pacote
@@ -56,9 +57,20 @@ Ainda tem alguns arquivos ao final (98 e 99) em caráter preliminar
 (até por isso essa numeração).
 O que eles fazem é reproduzir o trabalho de 2016.
 
+# Resultados preliminares
 
+## Participação relativa das esferas
 
+![](relativo.png)
 
+## Massa dos valores das esferas (em bilhões de R$ de 2018)
 
+![](massas.png)
 
+## Renda média das unidades (em R$ de 2018)
 
+![](media.png)
+
+## Quantidade de famílias (em milhões de unidades)
+
+![](unidades.png)

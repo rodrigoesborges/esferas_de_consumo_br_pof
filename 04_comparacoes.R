@@ -71,7 +71,8 @@ estat_ponderadas <- gastos_expandidos %>%
   summarise(massa = sum(valor),
             peso_final = first(peso_final)) %>% 
   summarise(massa_valor = sum(massa * peso_final),
-            media_pond = weighted.mean(massa, peso_final))
+            media_pond = weighted.mean(massa, peso_final), 
+            unidades = sum(peso_final))
 
 ipca <- tribble(
   ~ano, ~ipca,
@@ -98,15 +99,17 @@ ipca <- tribble(
     deflator = indice_acum / last(indice_acum)
   )
 
-estat_ponderadas %>% 
+estat_defla <- estat_ponderadas %>% 
   left_join(select(ipca, ano, deflator), by = "ano") %>% 
-  mutate(bi = massa_valor * 12 / 1e9 / deflator) %>% 
-  filter(!is.na(esfera)) %>% 
-  ggplot(aes(ano, bi, col = esfera)) + 
+  mutate(bi = massa_valor * 12 / 1e9 / deflator,
+         media_pond = media_pond / deflator) %>% 
+  filter(!is.na(esfera)) 
+
+ggplot(estat_defla, aes(ano, bi, col = esfera)) + 
   geom_line(size = 1) + 
   geom_point(size = 2, col = "black") + 
   geom_text(aes(label = round(bi)),
-            nudge_y = c(rep(c(200, -200, 200), times = 2), rep(200, 3))) + 
+            nudge_y = rep(c(200, -200, 200), times = 2)) + 
   scale_x_continuous(breaks = c(2003, 2009, 2018)) + 
   theme_classic() +
   labs(x = "", y = "Estimativa (R$ 2018, bilhões)",
@@ -114,18 +117,29 @@ estat_ponderadas %>%
        subtitle = "POFs de 2003, 2009 e 2018")
 
 
-estat_ponderadas %>% 
-  mutate(p = 100 * massa_valor / sum(massa_valor)) %>% 
-  ggplot(aes(ano, p, col = esfera)) + 
+ggplot(estat_defla, aes(ano, media_pond, col = esfera)) + 
   geom_line(size = 1) + 
   geom_point(size = 2, col = "black") + 
-  geom_text(aes(label = round(p)),
-            nudge_y = c(rep(c(7, -7, 7), times = 2), rep(7, 3))) + 
+  geom_text(aes(label = round(media_pond) %>% prettyNum(".", decimal.mark = ",")),
+            nudge_y = rep(c(-500, 500), times = 3),
+            nudge_x = rep(c(0.3, 0, -0.3), each = 2)) + 
   scale_x_continuous(breaks = c(2003, 2009, 2018)) + 
   theme_classic() +
-  labs(x = "", y = "Participação no total (%)",
+  labs(x = "", y = "Renda média (R$ 2018)",
        title = "Esferas de consumo", 
        subtitle = "POFs de 2003, 2009 e 2018")
 
+
+ggplot(estat_defla, aes(ano, unidades / 1e6, col = esfera)) + 
+  geom_line(size = 1) + 
+  geom_point(size = 2, col = "black") + 
+  geom_text(aes(label = round(unidades /1e6, 1) %>% 
+                  prettyNum(".", decimal.mark = ",")),
+            nudge_y = rep(c(5, -5), times = 3)) + 
+  scale_x_continuous(breaks = c(2003, 2009, 2018)) + 
+  theme_classic() +
+  labs(x = "", y = "Milhões de unidades",
+       title = "Esferas de consumo", 
+       subtitle = "POFs de 2003, 2009 e 2018")
 
 
