@@ -36,9 +36,12 @@ o `96` e o `98` tem que ser rodados antes do `02` e `03`.
 source("00_funcoes.R")
 # Funções carregadas
 ls()
-#> [1] "classificar_rendimentos" "instrucoes_sas"         
-#> [3] "ler_despesas2018"        "ler_rendimentos2018"    
-#> [5] "subst_na"
+#>  [1] "classificar_rendimentos"     "classificar_rendimentos2003"
+#>  [3] "classificar_rendimentos2009" "instrucoes_sas"             
+#>  [5] "ler_despesas2003"            "ler_despesas2009"           
+#>  [7] "ler_despesas2018"            "ler_rendimentos2003"        
+#>  [9] "ler_rendimentos2009"         "ler_rendimentos2018"        
+#> [11] "subst_na"
 
 t0 <- Sys.time()
 source("01_rend_desp.R")
@@ -121,16 +124,19 @@ source("01_rend_desp.R")
 #> )
 #> See spec(...) for full column specifications.
 Sys.time() - t0
-#> Time difference of 1.864457 mins
+#> Time difference of 1.738312 mins
 # tabelas carregadas
 ls()
-#>  [1] "classificar_rendimentos" "corte"                  
-#>  [3] "despesas_esferas"        "esferas_ucs"            
-#>  [5] "instrucoes_sas"          "ler_despesas2018"       
-#>  [7] "ler_rendimentos2018"     "rendas_classificadas"   
-#>  [9] "rendas_esferas"          "rendas_ucs"             
-#> [11] "rendas2018"              "subst_na"               
-#> [13] "t0"
+#>  [1] "classificar_rendimentos"     "classificar_rendimentos2003"
+#>  [3] "classificar_rendimentos2009" "corte"                      
+#>  [5] "despesas_esferas"            "esferas_ucs"                
+#>  [7] "instrucoes_sas"              "ler_despesas2003"           
+#>  [9] "ler_despesas2009"            "ler_despesas2018"           
+#> [11] "ler_rendimentos2003"         "ler_rendimentos2009"        
+#> [13] "ler_rendimentos2018"         "rendas_classificadas"       
+#> [15] "rendas_esferas"              "rendas_ucs"                 
+#> [17] "rendas2018"                  "subst_na"                   
+#> [19] "t0"
 ```
 
 Ainda tem alguns arquivos ao final (98 e 99) em caráter preliminar (até
