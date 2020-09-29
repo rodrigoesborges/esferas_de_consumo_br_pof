@@ -17,8 +17,8 @@ ler_rendimentos2003 <- function() {
          call. = FALSE)
   }
   
-  domicilio <- readRDS( "dados/2003/t_domicilio.rds" ) %>% 
-    as_tibble()
+  # domicilio <- readRDS( "dados/2003/t_domicilio.rds" ) %>% 
+  #   as_tibble()
   
   rendimentos <- readRDS("dados/2003/t_rendimentos.rds") %>% 
     as_tibble()
@@ -31,9 +31,9 @@ ler_rendimentos2003 <- function() {
     read_csv2() %>% 
     set_names(c("cod_novo","tipoderendimento","cod_rec"))
   
-  # Do some recodes
-  t_domicilio <- domicilio %>% 
-    mutate(estrato_unico = uf*100 + estrato)
+  # # Do some recodes
+  # t_domicilio <- domicilio %>% 
+  #   mutate(estrato_unico = uf*100 + estrato)
   
   incomeRecodesX <- read_csv("https://raw.githubusercontent.com/rodrigoesborges/pofesferas/master/tradutores/tradutor-detalhado2003-reag.csv") %>% 
     rename(cod_novo = cod.novo, cod_rec = cod.rec)
@@ -47,7 +47,8 @@ ler_rendimentos2003 <- function() {
   
   t_rendimentos_recoded <- t_rendimentos %>% 
     left_join(incomeRecodesX, by = "cod_rec") %>% 
-    select(cod_rec, cod_uc, recmes, fator_set, fator, cod_novo)
+    select(cod_rec, cod_uc, recmes, fator_set, fator, cod_novo, 
+           pos_ocup, c_ocupacao, c_atividade)
   
   
   t_outros_reci <- outros_reci %>% 
@@ -61,42 +62,62 @@ ler_rendimentos2003 <- function() {
     left_join(incomeRecodesX, by = "cod_rec") %>% 
     select(cod_rec, cod_uc, recmes, fator_set, fator, cod_novo )
   
-  rbind(t_rendimentos_recoded, t_outros_reci_recoded)
+  bind_rows(t_rendimentos_recoded, t_outros_reci_recoded)
 }
 
 classificar_rendimentos2003 <- function(df) {
-  morador <- readRDS("dados/2003/t_morador.rds") %>% 
-    as_tibble()
+  # morador <- readRDS("dados/2003/t_morador.rds") %>% 
+  #   as_tibble()
+  # 
+  # t_morador <- morador %>% 
+  #   mutate(cod_uc = paste0( uf , seq , dv , domcl , uc ) )
+  # 
+  # domicilio_rendas <- t_morador %>% 
+  #   select(cod_uc, renda) %>% 
+  #   unique()
+  # 
+  # componentes <- incomeRecodesX %>% 
+  #   set_names(c("cod_novo","tipoderendimento","cod_rec"))
+  # 
+  # # Now we generate the vector that will be used as base for our aggregation criteria
+  # # First we take (in fixed form) all items / subcodes
+  # todos.subcodigos.tiporenda <- componentes %>% 
+  #   filter(substring(cod_novo,1, 1) == 1) %>% 
+  #   select(cod_novo)
+  # 
+  # # next we aggregate by family/household the recoded income data
+  # domicilios_porcodigo <- df %>% 
+  #   filter(cod_novo %in% todos.subcodigos.tiporenda$cod_novo) %>% 
+  #   select(cod_novo, recmes, cod_uc)
+  # 
+  # domicilios_porcodigo_agregados <- domicilios_porcodigo %>% 
+  #   dplyr::mutate(nivel = stringr::str_remove_all(cod_novo, "\\.") %>% 
+  #                   as.numeric() ) %>% 
+  #   dplyr::group_by(cod_uc, nivel) %>% 
+  #   dplyr::summarise(recmes = sum(recmes))
   
-  t_morador <- morador %>% 
-    mutate(cod_uc = paste0( uf , seq , dv , domcl , uc ) )
-  
-  domicilio_rendas <- t_morador[ , c( 'cod_uc' , 'renda' ) ] %>% 
-    unique()
-  
-  componentes <- incomeRecodesX %>% 
-    set_names(c("cod_novo","tipoderendimento","cod_rec"))
-  
-  # Now we generate the vector that will be used as base for our aggregation criteria
-  # First we take (in fixed form) all items / subcodes
-  todos.subcodigos.tiporenda <- componentes %>% 
-    filter(substring(cod_novo,1, 1) == 1) %>% 
-    select(cod_novo)
-  
-  # next we aggregate by family/household the recoded income data
-  domicilios_porcodigo <- df %>% 
-    filter(cod_novo %in% todos.subcodigos.tiporenda$cod_novo) %>% 
-    select(cod_novo, recmes, cod_uc)
-  
-  domicilios_porcodigo_agregados <- domicilios_porcodigo %>% 
+  # domicilios_porcodigo_agregados %>%
+  df %>% 
     dplyr::mutate(nivel = stringr::str_remove_all(cod_novo, "\\.") %>% 
                     as.numeric() ) %>% 
-    dplyr::group_by(cod_uc, nivel) %>% 
-    dplyr::summarise(recmes = sum(recmes))
-  
-  domicilios_porcodigo_agregados %>%
+    dplyr::filter(!is.na(nivel)) %>% 
     dplyr::mutate(forma = dplyr::case_when(
-      nivel == 111 ~ "cv", # empregado mas sem informação da v5302
+        # rendimento de empregado baseado no vínculo
+        nivel == 111 & pos_ocup == 3 ~ "cv", # doméstico
+        nivel == 111 & ((c_ocupacao %/% 1000) == 0) ~ "mv", # militares
+        nivel == 111 & pos_ocup == 1 ~ "cv", #privado
+        # setor estatutário
+        # nivel == 111 & v5302 == 4 & v5303 == 1 ~ "mv",
+        # supoe não ter informalidade no setor publico
+        # trabalhador de estatal
+        # nivel == 111 & v5302 == 4 & v5304 == 1 ~ "cv",
+        # Tem casos (2491) de servidor sem carteria assinada ou estatuto. Pq?
+        nivel == 111 & pos_ocup == 2 ~ "mv", # empregado público
+        nivel == 111 & pos_ocup == 6 ~ "mv", # empregador
+        nivel == 111 & pos_ocup == 7 ~ "cp", # conta própria
+        # trab não remunerado e outros (estagiário, etc) ?
+        nivel == 111 & pos_ocup %in% c(4, 5, 8:10) ~ "cv", 
+      nivel == 111 ~ "cv", # empregado mas sem informação da pos_ocup
       nivel == 112 ~ "mv", # empregador
       nivel == 121 ~ "cv", # INSS
       nivel == 122 ~ "cv", # previdencia pública
@@ -234,7 +255,8 @@ ler_rendimentos2009 <- function() {
       cod_rec = paste0( num_quadro, substr(cod_item,1,3))
     ) %>% 
     dplyr::left_join(incomeRecodesX, by = "cod_rec") %>% 
-    dplyr::select(cod_rec, cod_uc, recmes, fator_expansao1, fator_expansao2, cod_novo)
+    dplyr::select(cod_rec, cod_uc, recmes, fator_expansao1, fator_expansao2, 
+                  cod_novo, cod_posi_ocupa, cod_ocup_final)
   
   # É aqui que precisamos mexer caso queramos incluir critérios do informantes
   # setor que trabalho, profissao, etc
@@ -245,7 +267,8 @@ ler_rendimentos2009 <- function() {
       cod_rec = paste0( num_quadro, substr(cod_item,1,3))
     ) %>% 
     dplyr::left_join(incomeRecodesX, by = "cod_rec") %>% 
-    dplyr::select(cod_rec, cod_uc, recmes, fator_expansao1, fator_expansao2, cod_novo)
+    dplyr::select(cod_rec, cod_uc, recmes, fator_expansao1, fator_expansao2, 
+                  cod_novo)
   
   rendimentos_recoded %>% 
     dplyr::bind_rows(outros_reci_recoded)
@@ -254,34 +277,56 @@ ler_rendimentos2009 <- function() {
 
 classificar_rendimentos2009 <- function(df) {
   
-  morador <- readRDS("dados/2009/Dados/t_morador_s.rds") %>% 
-    tibble::as_tibble()
-  
-  componentes <- "https://raw.githubusercontent.com/rodrigoesborges/pofesferas/master/tradutores/codigos-recodificacao-rendimentos.csv" %>% 
-    readr::read_csv2() %>% 
-    dplyr::mutate(cod.inc = gsub(".*\\+.*", "50000", cod.inc)) %>% 
-    purrr::set_names(c("cod_novo","tipoderendimento","cod_rec"))
-  
-  domicilio_rendas <- morador %>% 
-    dplyr::mutate(cod_uc = paste0( cod_uf, num_seq, num_dv, cod_domc, num_uc )) %>% 
-    dplyr::select(cod_uc, renda_total) %>% 
-    unique()
-  
-  todos_subcodigos_tiporenda <- componentes %>% 
-    dplyr::filter(substring(cod_novo, 1, 1) == 1) %>% 
-    dplyr::pull('cod_novo')
-  
-  domicilios_porcodigo <- df %>% 
-    dplyr::filter(cod_novo %in% todos_subcodigos_tiporenda) %>% 
-    dplyr::select(cod_novo, recmes, cod_uc)
-  
-  domicilios_porcodigo_agregados <- domicilios_porcodigo %>% 
-    dplyr::group_by(cod_uc, nivel = cod_novo) %>% 
-    dplyr::summarise(recmes = sum(recmes))
-  
-  domicilios_porcodigo_agregados %>%
-    dplyr::mutate(forma = dplyr::case_when(
-      nivel == 111 ~ "cv", # empregado mas sem informação da v5302
+  # morador <- readRDS("dados/2009/Dados/t_morador_s.rds") %>% 
+  #   tibble::as_tibble()
+  # 
+  # componentes <- "https://raw.githubusercontent.com/rodrigoesborges/pofesferas/master/tradutores/codigos-recodificacao-rendimentos.csv" %>% 
+  #   readr::read_csv2() %>% 
+  #   dplyr::mutate(cod.inc = gsub(".*\\+.*", "50000", cod.inc)) %>% 
+  #   purrr::set_names(c("cod_novo","tipoderendimento","cod_rec"))
+  # 
+  # domicilio_rendas <- morador %>% 
+  #   dplyr::mutate(cod_uc = paste0( cod_uf, num_seq, num_dv, cod_domc, num_uc )) %>% 
+  #   dplyr::select(cod_uc, renda_total) %>% 
+  #   unique()
+  # 
+  # todos_subcodigos_tiporenda <- componentes %>% 
+  #   dplyr::filter(substring(cod_novo, 1, 1) == 1) %>% 
+  #   dplyr::pull('cod_novo')
+  # 
+  # domicilios_porcodigo <- df %>% 
+  #   dplyr::filter(cod_novo %in% todos_subcodigos_tiporenda) %>% 
+  #   dplyr::select(cod_novo, recmes, cod_uc)
+  # 
+  # domicilios_porcodigo_agregados <- domicilios_porcodigo %>% 
+  #   dplyr::group_by(cod_uc, nivel = cod_novo) %>% 
+  #   dplyr::summarise(recmes = sum(recmes))
+  # 
+  # domicilios_porcodigo_agregados %>%
+  # dplyr::mutate(forma = dplyr::case_when(
+  df %>% 
+    dplyr::rename(nivel = cod_novo) %>% 
+    dplyr::filter(!is.na(nivel)) %>% 
+    dplyr::mutate(
+      cod_posi_ocupa = as.numeric(cod_posi_ocupa),
+      cod_ocup_final = as.numeric(cod_ocup_final),
+      forma = dplyr::case_when(
+      # rendimento de empregado baseado no vínculo
+      nivel == 111 & cod_posi_ocupa == 3 ~ "cv", # doméstico
+      nivel == 111 & ((cod_ocup_final %/% 1000) == 0) ~ "mv", # militares
+      nivel == 111 & cod_posi_ocupa == 1 ~ "cv", #privado
+      # setor estatutário
+      # nivel == 111 & v5302 == 4 & v5303 == 1 ~ "mv",
+      # supoe não ter informalidade no setor publico
+      # trabalhador de estatal
+      # nivel == 111 & v5302 == 4 & v5304 == 1 ~ "cv",
+      # Tem casos (2491) de servidor sem carteria assinada ou estatuto. Pq?
+      nivel == 111 & cod_posi_ocupa == 2 ~ "mv", # empregado público
+      nivel == 111 & cod_posi_ocupa == 5 ~ "mv", # empregador
+      nivel == 111 & cod_posi_ocupa == 6 ~ "cp", # conta própria
+      # trab não remunerado e outros (estagiário, etc) ?
+      nivel == 111 & cod_posi_ocupa %in% c(4, 7:9) ~ "cv", 
+      nivel == 111 ~ "cv", # empregado mas sem informação da cod_posi_ocupa
       nivel == 112 ~ "mv", # empregador
       nivel == 121 ~ "cv", # INSS
       nivel == 122 ~ "cv", # previdencia pública
@@ -462,42 +507,42 @@ ler_rendimentos2018 <- function() {
 }
 
 classificar_rendimentos <- function(df) {
-  # junta_rendas <- df %>% 
+  junta_rendas <- df %>%
     # Os casos que caem com o filtro abaixo são movimentações 
     # financeiras que não sao renda
     # deposito de poupança, compra de ações, etc...
-    # filter(!is.na(nivel)) %>%
-    # mutate(forma = case_when(
-    #   # rendimento de empregado baseado no vínculo
-    #   nivel == 111 & v5302 == 1 ~ "cv",
-    #   nivel == 111 & v5302 == 2 ~ "mv",
-    #   nivel == 111 & v5302 == 3 ~ "cv",
-    #   # setor estatutário
-    #   nivel == 111 & v5302 == 4 & v5303 == 1 ~ "mv", 
-    #   # supoe não ter informalidade no setor publico
-    #   # trabalhador de estatal
-    #   nivel == 111 & v5302 == 4 & v5304 == 1 ~ "cv", 
-    #   # Tem casos (2491) de servidor sem carteria assinada ou estatuto. Pq?
-    #   nivel == 111 & v5302 == 4 ~ "mv", # caso acima
-    #   nivel == 111 & v5302 == 5 ~ "mv", # empregador
-    #   nivel == 111 & v5302 == 6 ~ "cp", # conta própria
-    #   nivel == 111 & v5302 == 7 ~ "cv", # trab não remunerado ?
-    #   nivel == 111 ~ "cv", # empregado mas sem informação da v5302
-    #   nivel == 112 ~ "mv", # empregador
-    #   nivel == 121 ~ "cv", # INSS
-    #   nivel == 122 ~ "cv", # previdencia pública
-    #   nivel == 123 ~ "mv", # previdencia privada
-    #   nivel == 124 ~ "cv", # programas sociais
-    #   nivel == 13 ~ "mv", # aluguel
-    #   nivel == 14 ~ "mv", # outras rendas (morador ausente, menor de 10,
-    #   # indenização judicial, acoes, juros, outros)
-    #   
-    #   # Deixei esses casos por ultimo por sao casos para pensarmos
-    #   nivel == 113 ~ "cp", # conta própria
-    #   nivel == 125 ~ "cv", # pensao alimenticia, mesada, etc ?
-    #   nivel == 126 ~ "cv", # outras transferências
-    #   TRUE ~ NA_character_,
-    # ))
+    filter(!is.na(nivel)) %>%
+    mutate(forma = case_when(
+      # rendimento de empregado baseado no vínculo
+      nivel == 111 & v5302 == 1 ~ "cv",
+      nivel == 111 & v5302 == 2 ~ "mv",
+      nivel == 111 & v5302 == 3 ~ "cv",
+      # setor estatutário
+      # nivel == 111 & v5302 == 4 & v5303 == 1 ~ "mv",
+      # supoe não ter informalidade no setor publico
+      # trabalhador de estatal
+      # nivel == 111 & v5302 == 4 & v5304 == 1 ~ "cv",
+      # Tem casos (2491) de servidor sem carteria assinada ou estatuto. Pq?
+      nivel == 111 & v5302 == 4 ~ "mv", # empregado público
+      nivel == 111 & v5302 == 5 ~ "mv", # empregador
+      nivel == 111 & v5302 == 6 ~ "cp", # conta própria
+      nivel == 111 & v5302 == 7 ~ "cv", # trab não remunerado ?
+      nivel == 111 ~ "cv", # empregado mas sem informação da v5302
+      nivel == 112 ~ "mv", # empregador
+      nivel == 121 ~ "cv", # INSS
+      nivel == 122 ~ "cv", # previdencia pública
+      nivel == 123 ~ "mv", # previdencia privada
+      nivel == 124 ~ "cv", # programas sociais
+      nivel == 13 ~ "mv", # aluguel
+      nivel == 14 ~ "mv", # outras rendas (morador ausente, menor de 10,
+      # indenização judicial, acoes, juros, outros)
+
+      # Deixei esses casos por ultimo por sao casos para pensarmos
+      nivel == 113 ~ "cp", # conta própria
+      nivel == 125 ~ "cv", # pensao alimenticia, mesada, etc ?
+      nivel == 126 ~ "cv", # outras transferências
+      TRUE ~ NA_character_,
+    ))
   
   # O código abaixo foi usado para definir a renda dos conta-própria
   # que deve ser usada para classificar como baixa/alta
@@ -512,35 +557,35 @@ classificar_rendimentos <- function(df) {
   
   # algo semelhante pode ser feito para rendas dos empresários
   # para eliminar MEIs que contratam 1 pessoa
-  # junta_rendas %>%
-  #   mutate(forma = ifelse(forma != "cp", forma,
-  #                         # valor usado vem do gráfico acima
-  #                         ifelse(valor_mensal > 6000, "mv", "cv")))
+  junta_rendas %>%
+    mutate(forma = ifelse(forma != "cp", forma,
+                          # valor usado vem do gráfico acima
+                          ifelse(valor_mensal > 6000, "mv", "cv")))
   
-  df %>% 
-    dplyr::filter(!is.na(nivel)) %>%
-    dplyr::mutate(forma = dplyr::case_when(
-    nivel == 111 ~ "cv", # empregado mas sem informação da v5302
-    nivel == 112 ~ "mv", # empregador
-    nivel == 121 ~ "cv", # INSS
-    nivel == 122 ~ "cv", # previdencia pública
-    nivel == 123 ~ "mv", # previdencia privada
-    nivel == 124 ~ "cv", # programas sociais
-    nivel == 13 ~ "mv", # aluguel
-    nivel == 14 ~ "mv", # outras rendas (morador ausente, menor de 10,
-    # indenização judicial, acoes, juros, outros)
-    
-    # Deixei esses casos por ultimo por sao casos para pensarmos
-    nivel == 113 ~ "cp", # conta própria
-    nivel == 125 ~ "cv", # pensao alimenticia, mesada, etc ?
-    nivel == 126 ~ "cv", # outras transferências
-    TRUE ~ NA_character_,
-  ),
-  # Esses dois 2.500 viram da análise de Kmeans
-  # das rendas de conta-própria com 2 núcleos
-  forma = ifelse(forma != "cp", forma, 
-                 ifelse(valor_mensal > 6000, "mv", "cv"))
-  )
+  # df %>% 
+  #   dplyr::filter(!is.na(nivel)) %>%
+  #   dplyr::mutate(forma = dplyr::case_when(
+  #   nivel == 111 ~ "cv", # empregado mas sem informação da v5302
+  #   nivel == 112 ~ "mv", # empregador
+  #   nivel == 121 ~ "cv", # INSS
+  #   nivel == 122 ~ "cv", # previdencia pública
+  #   nivel == 123 ~ "mv", # previdencia privada
+  #   nivel == 124 ~ "cv", # programas sociais
+  #   nivel == 13 ~ "mv", # aluguel
+  #   nivel == 14 ~ "mv", # outras rendas (morador ausente, menor de 10,
+  #   # indenização judicial, acoes, juros, outros)
+  #   
+  #   # Deixei esses casos por ultimo por sao casos para pensarmos
+  #   nivel == 113 ~ "cp", # conta própria
+  #   nivel == 125 ~ "cv", # pensao alimenticia, mesada, etc ?
+  #   nivel == 126 ~ "cv", # outras transferências
+  #   TRUE ~ NA_character_,
+  # ),
+  # # Esses dois 2.500 viram da análise de Kmeans
+  # # das rendas de conta-própria com 2 núcleos
+  # forma = ifelse(forma != "cp", forma, 
+  #                ifelse(valor_mensal > 6000, "mv", "cv"))
+  # )
 }
 
 ler_despesas2018 <- function() {
