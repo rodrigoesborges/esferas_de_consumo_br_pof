@@ -58,7 +58,7 @@ esferas_ucs2003 <- rendas_esferas2003 %>%
   select(cod_uc, esfera)
 
 # Etapa 4 -----------------------------------------------------------
-despesas_esferas2003 <- ler_despesas2018() %>%
+despesas_esferas2003 <- ler_despesas2003() %>%
   left_join(esferas_ucs2003, by = "cod_uc") %>% 
   select(cod_uc, codigo, esfera, despmes)
   # sem níveis nessa versão
