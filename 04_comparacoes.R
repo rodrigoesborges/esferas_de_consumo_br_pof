@@ -30,6 +30,7 @@ estats %>%
        title = "Esferas de consumo", 
        subtitle = "POFs de 2003, 2009 e 2018")
 
+ggsave("relativo.png")
 
 pesos2003 <- readRDS("dados/2003/t_morador.rds") %>% 
   as_tibble() %>% 
@@ -46,7 +47,7 @@ pesos2009 <- readRDS("dados/2009/Dados/t_morador_s.rds") %>%
          peso_final = fator_expansao2) %>% 
   unique()
 
-pesos2018 <- ler_morador(2018) %>% 
+pesos2018 <- pof::ler_morador(2018) %>% 
   mutate(cod_uc = paste0(UF, ESTRATO_POF, TIPO_SITUACAO_REG,
                       COD_UPA, NUM_DOM, NUM_UC),
          ano = 2018) %>% 
@@ -116,6 +117,7 @@ ggplot(estat_defla, aes(ano, bi, col = esfera)) +
        title = "Esferas de consumo", 
        subtitle = "POFs de 2003, 2009 e 2018")
 
+ggsave("massas.png")
 
 ggplot(estat_defla, aes(ano, media_pond, col = esfera)) + 
   geom_line(size = 1) + 
@@ -129,6 +131,7 @@ ggplot(estat_defla, aes(ano, media_pond, col = esfera)) +
        title = "Esferas de consumo", 
        subtitle = "POFs de 2003, 2009 e 2018")
 
+ggsave("media.png")
 
 ggplot(estat_defla, aes(ano, unidades / 1e6, col = esfera)) + 
   geom_line(size = 1) + 
@@ -142,4 +145,4 @@ ggplot(estat_defla, aes(ano, unidades / 1e6, col = esfera)) +
        title = "Esferas de consumo", 
        subtitle = "POFs de 2003, 2009 e 2018")
 
-
+ggsave("unidades.png")
