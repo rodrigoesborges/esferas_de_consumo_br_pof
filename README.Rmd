@@ -61,16 +61,16 @@ O que eles fazem é reproduzir o trabalho de 2016.
 
 ## Participação relativa das esferas
 
-![](relativo.png)
+![](imagens/relativo.png)
 
 ## Massa dos valores das esferas (em bilhões de R$ de 2018)
 
-![](massas.png)
+![](imagens/massas.png)
 
 ## Renda média das unidades (em R$ de 2018)
 
-![](media.png)
+![](imagens/media.png)
 
 ## Quantidade de famílias (em milhões de unidades)
 
-![](unidades.png)
+![](imagens/unidades.png)
