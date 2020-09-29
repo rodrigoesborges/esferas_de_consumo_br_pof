@@ -72,5 +72,5 @@ O que eles fazem é reproduzir o trabalho de 2016.
 ![](imagens/media.png)
 
 ## Quantidade de famílias (em milhões de unidades)
- 
+
 ![](imagens/unidades.png)
