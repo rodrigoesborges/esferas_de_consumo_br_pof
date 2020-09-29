@@ -48,7 +48,7 @@ rendas_ucs <- rendas_classificadas %>%
 #   theme(legend.position = "none")
 
 # A análise acima propor o corte de 63% para esfera alta/baixa
-corte <- 0.63
+corte <- 0.6
 
 # Etapa 3 -----------------------------------------------------------
 rendas_esferas <- rendas_ucs %>%
@@ -75,3 +75,7 @@ despesas_esferas %>%
   filter(nivel == 110803) %>%
   mutate(partic = soma / sum(soma))
 
+despesas_esferas %>% 
+  mutate(ano = 2018) %>% 
+  select(-starts_with("nivel")) %>% 
+  write_csv("gastos_esferas_2018.csv")
