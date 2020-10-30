@@ -48,7 +48,7 @@ ler_rendimentos2003 <- function() {
     mutate(
       recmes = rend_def_anual / deflator / 12 ,
       cod_uc = paste0( uf , seq , dv , domcl , uc ),
-      cod_rec = quadro*1000+ floor(item/100)
+      cod_rec = quadro * 1000 + floor(item/100)
     )
   
   t_outros_reci_recoded <- t_outros_reci %>% 
