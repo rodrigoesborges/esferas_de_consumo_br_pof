@@ -23,7 +23,7 @@ estats %>%
   geom_text(aes(label = round(partic * 100)), 
             # filter(estats, ano == 2018), 
             # nudge_y = 7) + 
-            nudge_y = c(rep(c(7, -7, 7), times = 2), rep(7, 3))) + 
+            nudge_y = c(rep(c(-7, 7, 7), times = 2), rep(7, 3))) + 
   scale_x_continuous(breaks = c(2003, 2009, 2018)) + 
   theme_classic() +
   labs(x = "", y = "Participação no total (%)",
@@ -110,7 +110,7 @@ ggplot(estat_defla, aes(ano, bi, col = esfera)) +
   geom_line(size = 1) + 
   geom_point(size = 2, col = "black") + 
   geom_text(aes(label = round(bi)),
-            nudge_y = rep(c(200, -200, 200), times = 2)) + 
+            nudge_y = 100) + 
   scale_x_continuous(breaks = c(2003, 2009, 2018)) + 
   theme_classic() +
   labs(x = "", y = "Estimativa (R$ 2018, bilhões)",
@@ -146,3 +146,73 @@ ggplot(estat_defla, aes(ano, unidades / 1e6, col = esfera)) +
        subtitle = "POFs de 2003, 2009 e 2018")
 
 ggsave("unidades.png")
+
+gastos2 <- gastos %>% 
+  filter(!is.na(cod_uc)) %>%
+  left_join(pesos, by = c("ano", "cod_uc")) %>% 
+  mutate(valor = ifelse(ano == 2018, valor / peso_final, valor)) %>% 
+  group_by(ano, cod_uc) %>% 
+  summarise(valor = sum(valor)) %>% 
+  mutate(clusters = list(kmeans(valor, 3)),
+         grupo = clusters[[1]]$cluster,
+         centro_cl = map(clusters, list("centers", as.vector)),
+         esfera = map2_int(centro_cl, grupo, ~.x[[.y]] == min(.x)),
+         esfera = c("alta", "baixa")[esfera + 1])
+
+estats_esf <- gastos2 %>% 
+  left_join(pesos) %>% 
+  group_by(ano, esfera) %>% 
+  summarise(massa = sum(valor * peso_final, na.rm = TRUE),
+            media = weighted.mean(valor, peso_final, na.rm = TRUE),
+            unidades = sum(peso_final)) %>% 
+  left_join(ipca) %>% 
+  mutate(p = massa * 100 / sum(massa),
+         massa_defla = massa / deflator / 1e9,
+         media_defla = media / deflator) %>% 
+  select(-ipca, -indice, -indice_acum, -deflator)
+
+estats_esf  %>% 
+  ggplot(aes(ano, media_defla, col = esfera)) + 
+  geom_line(size = 1) + 
+  geom_point(size = 2, col = "black") + 
+  geom_text(aes(label = round(media_defla) %>% prettyNum(".", decimal.mark = ",")),
+            nudge_y = rep(c(-1000, 1000), times = 3),
+            nudge_x = rep(c(0.3, 0, -0.3), each = 2)) + 
+  scale_x_continuous(breaks = c(2003, 2009, 2018)) + 
+  theme_classic() +
+  labs(x = "", y = "Renda média (R$ 2018)",
+       title = "Esferas de consumo", 
+       subtitle = "POFs de 2003, 2009 e 2018")
+
+estats_esf  %>% 
+  ggplot(aes(ano, media_defla, col = esfera)) + 
+  geom_line(size = 1) + 
+  geom_point(size = 2, col = "black") + 
+  geom_text(aes(label = round(media_defla) %>% prettyNum(".", decimal.mark = ",")),
+            nudge_y = rep(c(-1000, 1000), times = 3),
+            nudge_x = rep(c(0.3, 0, -0.3), each = 2)) + 
+  scale_x_continuous(breaks = c(2003, 2009, 2018)) + 
+  theme_classic() +
+  labs(x = "", y = "Renda média (R$ 2018)",
+       title = "Esferas de consumo", 
+       subtitle = "POFs de 2003, 2009 e 2018")
+  
+gastos_raiz <- gastos %>% 
+  group_by(ano, cod_uc, esfera) %>% 
+  summarise(valor = sum(valor))
+
+ggplot(gastos_raiz %>% filter(!is.na(esfera)), 
+       aes(factor(ano), valor, fill = esfera)) + 
+  geom_violin(draw_quantiles = 0.5) +
+  scale_y_log10() + 
+  facet_wrap(~factor(ano))
+  
+ggplot(gastos2 %>% filter(!is.na(esfera)), 
+       aes(factor(ano), valor, fill = esfera)) + 
+  geom_violin(draw_quantiles = 0.5) +
+  scale_y_log10() +
+  scale_y_continuous(limits = c(0, 20e3)) + 
+  facet_wrap(~factor(ano))
+
+
+
