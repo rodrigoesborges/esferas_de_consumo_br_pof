@@ -48,7 +48,7 @@ ggplot(rendas_ucs2003, aes(p_cv, total, col = factor(k_rendas$cluster))) +
   theme(legend.position = "none")
 
 # A análise acima propor o corte de 61% para esfera alta/baixa
-corte <- 0.60
+corte <- 0.95
 
 # Etapa 3 -----------------------------------------------------------
 rendas_esferas2003 <- rendas_ucs2003 %>%
@@ -68,7 +68,8 @@ despesas_esferas2003 <- ler_despesas2003() %>%
 despesas_esferas2003 %>%
   group_by(esfera) %>%
   summarise(soma = sum(despmes) * 12 / 1e9) %>% # Em bilhões
-  mutate(partic = soma / sum(soma))
+  filter(!is.na(esfera)) %>% 
+  mutate(partic = soma / sum(soma), tx_mv = soma / last(soma))
 
 despesas_esferas2003 %>% 
   mutate(ano = 2003) %>%
