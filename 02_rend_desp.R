@@ -48,7 +48,7 @@ rendas_ucs2009 <- rendas_classificadas2009 %>%
 #   theme(legend.position = "none")
 
 # A análise acima propor o corte de 63% para esfera alta/baixa
-corte <- 0.6
+corte <- 0.95
 
 # Etapa 3 -----------------------------------------------------------
 rendas_esferas2009 <- rendas_ucs2009 %>%
@@ -68,7 +68,8 @@ despesas_esferas <- ler_despesas2009() %>%
 despesas_esferas %>%
   group_by(esfera) %>%
   summarise(soma = sum(valor) * 12 / 1e9) %>% # Em bilhões
-  mutate(partic = soma / sum(soma))
+  filter(!is.na(esfera)) %>% 
+  mutate(partic = soma / sum(soma), tx_mv = soma / last(soma))
 
 despesas_esferas %>% 
   mutate(ano = 2009) %>% 

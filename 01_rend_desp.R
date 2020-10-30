@@ -24,6 +24,44 @@ library(tidyverse)
 # Etapa 1 -----------------------------------------------------------
 rendas2018 <- ler_rendimentos2018()
 
+km <- rendas2018 %>% 
+  group_by(cod_uc) %>% 
+  summarise(peso_final = first(peso_final),
+            valor = sum(valor_mensal)) %>% 
+  pull(valor) %>% 
+  kmeans(3)
+
+rendas2018 %>% 
+  group_by(cod_uc) %>% 
+  summarise(peso_final = first(peso_final),
+            valor = sum(valor_mensal)) %>% 
+  ggplot(aes(seq_along(valor), valor, col = factor(km$cluster))) + 
+  geom_point(alpha = 0.3) + 
+  # scale_y_log10() +
+  scale_y_continuous(limits = c(0, 50e3)) +
+  geom_hline(yintercept = 20e3)
+
+rendas2018 %>% 
+  group_by(cod_uc) %>% 
+  summarise(peso = first(peso_final),
+            valor = sum(valor_mensal)) %>% 
+  mutate(grupo = kmeans(valor, 3)$cluster, 
+         centros = list(kmeans(valor, 3)$centers %>% as.vector()),
+         grupo_tipo = centros[[]]) %>% 
+  group_by(grupo) %>% 
+  summarise(soma = sum(valor * 12 * peso / 1e9),
+            media = weighted.mean(valor, peso)) %>% 
+  arrange(desc(media))
+
+teste2 <- teste %>% 
+  mutate(teste = map2_dbl(centros, grupo, ~.x[[.y]] == min(.x)))
+
+teste2 %>% 
+  ggplot(aes(valor, seq_along(valor), col = factor(grupo))) + 
+  geom_point(alpha = 0.3) + 
+  geom_vline(xintercept = 20e3) + 
+  scale_x_log10()
+
 # Etapa 2 -----------------------------------------------------------
 rendas_classificadas <- classificar_rendimentos(rendas2018)
 
@@ -48,12 +86,17 @@ rendas_ucs <- rendas_classificadas %>%
 #   theme(legend.position = "none")
 
 # A análise acima propor o corte de 63% para esfera alta/baixa
-corte <- 0.6
+corte <- 0.95
 
 # Etapa 3 -----------------------------------------------------------
 rendas_esferas <- rendas_ucs %>%
   mutate(esfera = ifelse(p_cv > corte, "baixa", "alta"))
   
+rendas_esferas %>% 
+  group_by(esfera) %>% 
+  summarise(v= sum(total), n =  n()) %>% 
+  mutate(tx = v/last(v), p = n / sum(n))
+
 esferas_ucs <- rendas_esferas %>%
   select(cod_uc, esfera)
 

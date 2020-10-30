@@ -6,7 +6,7 @@ subst_na <-  function(x) {
 
 # ----- POF 2003 --------------------------------------------------------------
 ler_rendimentos2003 <- function() {
-  nomes <- c("morador", "domicilio", "rendimentos", "outros_reci")
+  nomes <- c("rendimentos", "outros_reci")
   arqs <- glue::glue(
     "dados/2003/t_{nomes}.rds"
   )
@@ -16,9 +16,6 @@ ler_rendimentos2003 <- function() {
          "Rode ele para poder executar essa função.", 
          call. = FALSE)
   }
-  
-  # domicilio <- readRDS( "dados/2003/t_domicilio.rds" ) %>% 
-  #   as_tibble()
   
   rendimentos <- readRDS("dados/2003/t_rendimentos.rds") %>% 
     as_tibble()
@@ -30,11 +27,7 @@ ler_rendimentos2003 <- function() {
   tabelagregada <- "https://raw.githubusercontent.com/rodrigoesborges/pofesferas/master/tradutores/codigos-recodificacao-rendimentos.csv" %>% 
     read_csv2() %>% 
     set_names(c("cod_novo","tipoderendimento","cod_rec"))
-  
-  # # Do some recodes
-  # t_domicilio <- domicilio %>% 
-  #   mutate(estrato_unico = uf*100 + estrato)
-  
+
   incomeRecodesX <- read_csv("https://raw.githubusercontent.com/rodrigoesborges/pofesferas/master/tradutores/tradutor-detalhado2003-reag.csv") %>% 
     rename(cod_novo = cod.novo, cod_rec = cod.rec)
   
@@ -55,7 +48,7 @@ ler_rendimentos2003 <- function() {
     mutate(
       recmes = rend_def_anual / deflator / 12 ,
       cod_uc = paste0( uf , seq , dv , domcl , uc ),
-      cod_rec = quadro*1000+ floor(item/100)
+      cod_rec = quadro * 1000 + floor(item/100)
     )
   
   t_outros_reci_recoded <- t_outros_reci %>% 
@@ -113,12 +106,12 @@ classificar_rendimentos2003 <- function(df) {
         # nivel == 111 & v5302 == 4 & v5304 == 1 ~ "cv",
         # Tem casos (2491) de servidor sem carteria assinada ou estatuto. Pq?
         nivel == 111 & pos_ocup == 2 ~ "mv", # empregado público
-        nivel == 111 & pos_ocup == 6 ~ "mv", # empregador
+        nivel == 111 & pos_ocup == 6 ~ "emp", # empregador
         nivel == 111 & pos_ocup == 7 ~ "cp", # conta própria
         # trab não remunerado e outros (estagiário, etc) ?
         nivel == 111 & pos_ocup %in% c(4, 5, 8:10) ~ "cv", 
       nivel == 111 ~ "cv", # empregado mas sem informação da pos_ocup
-      nivel == 112 ~ "mv", # empregador
+      nivel == 112 ~ "emp", # empregador
       nivel == 121 ~ "cv", # INSS
       nivel == 122 ~ "cv", # previdencia pública
       nivel == 123 ~ "mv", # previdencia privada
@@ -137,7 +130,9 @@ classificar_rendimentos2003 <- function(df) {
     # das rendas de conta-própria com 2 núcleos
     # foi excluido um outlier de 400.000
     forma = ifelse(forma != "cp", forma, 
-                   ifelse(recmes > 2000, "mv", "cv"))
+                   ifelse(recmes > 2000, "mv", "cv")),
+    forma = ifelse(forma != "emp", forma, 
+                   ifelse(recmes > 4500, "mv", "cv"))
     )
 }
 
@@ -210,7 +205,7 @@ ler_despesas2003 <- function() {
 
 # ----- POF 2009 --------------------------------------------------------------
 ler_rendimentos2009 <- function() {
-  nomes <- c("morador", "domicilio", "rendimentos", "outros_reci")
+  nomes <- c("rendimentos", "outros_reci")
   arqs <- glue::glue(
     "dados/2009/Dados/t_{nomes}_s.rds"
   )
@@ -221,18 +216,11 @@ ler_rendimentos2009 <- function() {
          call. = FALSE)
   }
   
-  domicilio <- readRDS("dados/2009/Dados/t_domicilio_s.rds") %>% 
-    tibble::as_tibble()
-  
   rendimentos <- readRDS("dados/2009/Dados/t_rendimentos_s.rds") %>% 
     tibble::as_tibble()
   
   outros_reci <- readRDS("dados/2009/Dados/t_outros_reci_s.rds") %>% 
     tibble::as_tibble()
-  
-  poststr <- readxl::read_excel(
-    "dados/2009/documentacao/Pos_estratos_totais.xls"
-  )
   
   incomeRecodes <- "https://raw.githubusercontent.com/rodrigoesborges/pofesferas/master/tradutores/codigos-recodificacao-rendimentos.csv" %>% 
     readr::read_csv2() %>% 
@@ -264,7 +252,7 @@ ler_rendimentos2009 <- function() {
     dplyr::mutate(
       recmes = ( valor_anual_expandido2 / fator_expansao2 ) / 12,
       cod_uc = paste0( cod_uf, num_seq, num_dv, cod_domc, num_uc ),
-      cod_rec = paste0( num_quadro, substr(cod_item,1,3))
+      cod_rec = paste0( num_quadro, substr(cod_item,1, 3))
     ) %>% 
     dplyr::left_join(incomeRecodesX, by = "cod_rec") %>% 
     dplyr::select(cod_rec, cod_uc, recmes, fator_expansao1, fator_expansao2, 
@@ -322,12 +310,12 @@ classificar_rendimentos2009 <- function(df) {
       # nivel == 111 & v5302 == 4 & v5304 == 1 ~ "cv",
       # Tem casos (2491) de servidor sem carteria assinada ou estatuto. Pq?
       nivel == 111 & cod_posi_ocupa == 2 ~ "mv", # empregado público
-      nivel == 111 & cod_posi_ocupa == 5 ~ "mv", # empregador
+      nivel == 111 & cod_posi_ocupa == 5 ~ "emp", # empregador
       nivel == 111 & cod_posi_ocupa == 6 ~ "cp", # conta própria
       # trab não remunerado e outros (estagiário, etc) ?
       nivel == 111 & cod_posi_ocupa %in% c(4, 7:9) ~ "cv", 
       nivel == 111 ~ "cv", # empregado mas sem informação da cod_posi_ocupa
-      nivel == 112 ~ "mv", # empregador
+      nivel == 112 ~ "emp", # empregador
       nivel == 121 ~ "cv", # INSS
       nivel == 122 ~ "cv", # previdencia pública
       nivel == 123 ~ "mv", # previdencia privada
@@ -345,7 +333,9 @@ classificar_rendimentos2009 <- function(df) {
     # Esses dois 2.500 viram da análise de Kmeans
     # das rendas de conta-própria com 2 núcleos
     forma = ifelse(forma != "cp", forma, 
-                   ifelse(recmes > 2500, "mv", "cv"))
+                   ifelse(recmes > 2500, "mv", "cv")),
+    forma = ifelse(forma != "emp", forma, 
+                   ifelse(recmes > 5000, "mv", "cv"))
     )
 
   # renda_m_total <- domicilios_porcodigo_agregados %>% 
@@ -458,7 +448,7 @@ ler_despesas2009 <- function() {
 
 # ----- POF 2018 --------------------------------------------------------------
 ler_rendimentos2018 <- function() {
-  morador_uc <- ler_morador(2018) %>%
+  morador_uc <- pof::ler_morador(2018) %>%
     select(UF, ESTRATO_POF, TIPO_SITUACAO_REG,
            COD_UPA, NUM_DOM ,NUM_UC, PESO_FINAL) %>%
     unique()
@@ -466,7 +456,7 @@ ler_rendimentos2018 <- function() {
   soma_familia <- sum(morador_uc$PESO_FINAL)
   
   # Precisei extrair os tradutores manualmente (questao de encoding)
-  dic_rendimento <- ler_tradutor_rendimento(2018)
+  dic_rendimento <- pof::ler_tradutor_rendimento(2018)
   
   dic2 <- dic_rendimento %>%
     dplyr::select(codigo, nivel = nivel_3, desc = descricao_3) %>%
@@ -477,7 +467,7 @@ ler_rendimentos2018 <- function() {
         dplyr::select(codigo, nivel = nivel_2, desc = descricao_2)
     )
   
-  rend_trabalho <- ler_rend_trab(2018) %>%
+  rend_trabalho <- pof::ler_rend_trab(2018) %>%
     filter(!is.na(V8500_DEFLA)) %>%
     transmute(
       V9001 = V9001,
@@ -488,7 +478,7 @@ ler_rendimentos2018 <- function() {
       peso_final = PESO_FINAL
     )
   
-  outros_rend <- ler_rend_outros(2018) %>%
+  outros_rend <- pof::ler_rend_outros(2018) %>%
     transmute(
       V9001 = V9001,
       cod_uc = paste0(UF, ESTRATO_POF, TIPO_SITUACAO_REG,
@@ -524,11 +514,11 @@ classificar_rendimentos <- function(df) {
       # nivel == 111 & v5302 == 4 & v5304 == 1 ~ "cv",
       # Tem casos (2491) de servidor sem carteria assinada ou estatuto. Pq?
       nivel == 111 & v5302 == 4 ~ "mv", # empregado público
-      nivel == 111 & v5302 == 5 ~ "mv", # empregador
+      nivel == 111 & v5302 == 5 ~ "emp", # empregador
       nivel == 111 & v5302 == 6 ~ "cp", # conta própria
       nivel == 111 & v5302 == 7 ~ "cv", # trab não remunerado ?
       nivel == 111 ~ "cv", # empregado mas sem informação da v5302
-      nivel == 112 ~ "mv", # empregador
+      nivel == 112 ~ "emp", # empregador
       nivel == 121 ~ "cv", # INSS
       nivel == 122 ~ "cv", # previdencia pública
       nivel == 123 ~ "mv", # previdencia privada
@@ -560,7 +550,10 @@ classificar_rendimentos <- function(df) {
   junta_rendas %>%
     mutate(forma = ifelse(forma != "cp", forma,
                           # valor usado vem do gráfico acima
-                          ifelse(valor_mensal > 6000, "mv", "cv")))
+                          ifelse(valor_mensal > 6000, "mv", "cv")),
+           forma = ifelse(forma != "emp", forma,
+                          # valor usado vem do gráfico acima
+                          ifelse(valor_mensal > 10000, "mv", "cv")))
   
   # df %>% 
   #   dplyr::filter(!is.na(nivel)) %>%
