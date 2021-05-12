@@ -30,7 +30,7 @@ estats %>%
        title = "Esferas de consumo", 
        subtitle = "POFs de 2003, 2009 e 2018")
 
-ggsave("imagens/relativo.png")
+ggsave("relativo.png")
 
 pesos2003 <- readRDS("dados/2003/t_morador.rds") %>% 
   as_tibble() %>% 
@@ -117,7 +117,7 @@ ggplot(estat_defla, aes(ano, bi, col = esfera)) +
        title = "Esferas de consumo", 
        subtitle = "POFs de 2003, 2009 e 2018")
 
-ggsave("imagens/massas.png")
+ggsave("massas.png")
 
 ggplot(estat_defla, aes(ano, media_pond, col = esfera)) + 
   geom_line(size = 1) + 
@@ -131,7 +131,7 @@ ggplot(estat_defla, aes(ano, media_pond, col = esfera)) +
        title = "Esferas de consumo", 
        subtitle = "POFs de 2003, 2009 e 2018")
 
-ggsave("imagens/media.png")
+ggsave("media.png")
 
 ggplot(estat_defla, aes(ano, unidades / 1e6, col = esfera)) + 
   geom_line(size = 1) + 
@@ -145,7 +145,7 @@ ggplot(estat_defla, aes(ano, unidades / 1e6, col = esfera)) +
        title = "Esferas de consumo", 
        subtitle = "POFs de 2003, 2009 e 2018")
 
-ggsave("imagens/unidades.png")
+ggsave("unidades.png")
 
 gastos2 <- gastos %>% 
   filter(!is.na(cod_uc)) %>%

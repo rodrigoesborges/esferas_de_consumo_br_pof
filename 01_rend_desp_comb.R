@@ -11,8 +11,8 @@ library(tidyverse)
 # 4) Vincular os gastos das UCs com as esferas
 
 
-# Etapa 0 ------------------ preparar repoditório -------------------
-# downaload_pof(2018)
+# Etapa 0 ------------------ preparar repositório -------------------
+# download_pof(2018)
 # unzip_pof(2018)
 # 
 ## Tive que usar essa linha de baixo pq o IBGE mudou
@@ -63,9 +63,18 @@ teste2 %>%
   scale_x_log10()
 
 # Etapa 2 -----------------------------------------------------------
-rendas_classificadas <- classificar_rendimentos(rendas2018)
+rendas_classificadas <- classificar_rendimentos(rendas2018,T)
 
-rendas_ucs <- rendas_classificadas %>%
+rendas_classificadas %<>% mutate(
+  forma = case_when(is.na(esfera_cod) ~ forma,
+  forma == "cv" & esfera_cod =="baixa" ~ "cv",
+  forma == "cv" & esfera_cod =="alta" ~ "mv",
+  forma == "mv" & esfera_cod =="alta" ~ "mv",
+  forma == "mv" & esfera_cod =="baixa" ~ "cv"
+  )
+)
+
+  rendas_ucs <- rendas_classificadas %>%
   group_by(cod_uc, forma) %>%
   summarise(renda = sum(valor_mensal)) %>%
   pivot_wider(names_from = forma, values_from = renda, 
@@ -86,7 +95,7 @@ rendas_ucs <- rendas_classificadas %>%
 #   theme(legend.position = "none")
 
 # A análise acima propor o corte de 63% para esfera alta/baixa
-corte <- 0.95
+corte <- 0.63
 
 # Etapa 3 -----------------------------------------------------------
 rendas_esferas <- rendas_ucs %>%
@@ -122,3 +131,4 @@ despesas_esferas %>%
   mutate(ano = 2018) %>% 
   select(-starts_with("nivel")) %>% 
   write_csv("gastos_esferas_2018.csv")
+
