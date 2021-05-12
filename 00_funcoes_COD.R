@@ -4,7 +4,7 @@ require(magrittr)
 require(dplyr)
 require(readxl)
 
-preparadicod <- function(ano, pasta = "sourcedata"){
+preparadicod <- function(ano, pasta = "sourcedata/"){
   require(magrittr)
   require(dplyr)
   arq <- paste0(pasta,"Ocupação COD-esferas",ano,".xlsx")
