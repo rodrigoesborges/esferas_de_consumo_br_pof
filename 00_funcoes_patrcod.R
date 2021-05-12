@@ -9,11 +9,11 @@ subst_na <-  function(x) {
   x
 }
 
-juntacod <- function(x,ocupacol){
+juntacod <- function(x,ano,ocupacol){
   require(tidyverse)
   source("00_funcoes_COD.R")
   
-  dicod <- preparadicod()
+  dicod <- preparadicod(ano)
   x <- x %>%  left_join(dicod, 
                         by = setNames("Grupo de base",ocupacol))
 }
@@ -22,8 +22,8 @@ juntacod <- function(x,ocupacol){
 
 dicfracoes <- tribble(
   ~fracao,~nomefracao,
-  1, "assalariados privados",
-  2, "assalariado de comércio e finanças",
+  1, "proletários privados",
+  2, "assalariado comércio/finanças, subproletários e demais",
   3, "demais assalariado privados e subproletários",
   4, "aristocracia operária",
   5, "média e grande burguesia",
@@ -34,10 +34,16 @@ dicfracoes <- tribble(
   10, "base das forças repressivas",
   11, "alto escalão das forças repressivas",
   12, "trabalhador aposentado",
-  13, "aristocracia operária ou pequeno burguesia aposentada"
+  13, "aristocracia operária ou pequeno burguesia aposentada",
+  14, "altíssimo escalão burocrático"
 )
 
+##Variáveis de agrupamento e corte
 
+corte <- 0.3
+baixa <- c(1,2,3,8,9,10,12)
+alta <- c(4,5,6,7,11,13,14)
+l <- gsub(" ","\n",levels(factor(dicfracoes$nomefracao)))
 # ----- POF 2003 --------------------------------------------------------------
 ler_rendimentos2003 <- function() {
   nomes <- c("rendimentos", "outros_reci")
@@ -173,7 +179,7 @@ classificar_rendimentos2003 <- function(df,cod = F) {
     )
     )
   if (cod == T){
-    df <- juntacod(df,"c_ocupacao")
+    df <- juntacod(df,2003,"c_ocupacao")
   }
 }
 
@@ -418,7 +424,7 @@ classificar_rendimentos2009 <- function(df, cod = F) {
   
   if (cod == T){
     df$cod_ocup_final <- as.numeric(df$cod_ocup_final)
-    df <- juntacod(df,"cod_ocup_final")
+    df <- juntacod(df,2009,"cod_ocup_final")
   }
   # renda_m_total <- domicilios_porcodigo_agregados %>% 
   #   dplyr::group_by(cod_uc) %>%
@@ -705,7 +711,7 @@ classificar_rendimentos <- function(df, cod = F) {
   # )
  # } else {
   if (cod == T) {
-   junta_rendas <- juntacod(junta_rendas,"v53011")
+   junta_rendas <- juntacod(junta_rendas,2018,"v53011")
   }
 #  }
 }

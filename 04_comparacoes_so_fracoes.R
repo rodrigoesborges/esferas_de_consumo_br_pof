@@ -1,8 +1,16 @@
 library(tidyverse)
+library(ggpubr)
+library(hrbrthemes)
+#devtools::install_github("hrbrmstr/waffle")
+library(waffle)
+library(scales)
+library(magrittr)
+library(extrafont)
+
 # Os arquivos lidos abaixo são gerados nos scripts 01, 02 e 03
 gastos2003 <- readr::read_csv("gastos_esferas_fracoes_2003.csv", 
                               col_types = "cccccddd")
-gastos2009 <- readr::read_csv("gastos_esferas_2009_fracoes.csv", 
+gastos2009 <- readr::read_csv("gastos_esferas_fracoes_2009.csv", 
                               col_types = "cccccddd")
 gastos2018 <- readr::read_csv("gastos_esferas_fracoes_2018.csv", 
                               col_types = "cccccddd")
@@ -296,14 +304,14 @@ anos <- c(2003,2009,2018)
 esfs <- c("baixa","alta")
 
 anosesf <- expand.grid(anos,esfs)
-anosesf$mostraleg <- rep(c(0,1,0),2)
-names(anosesf) <- c("qano","qesf")
 
+names(anosesf) <- c("qano","qesf")
+anosesf$mostraleg <- rep(c(0,1,0),2)
 #anosesf %<>% arrange(qano)
 
 plotagens <- mapply(grafp,anosesf$qano,anosesf$qesf,anosesf$mostraleg,SIMPLIFY = F)
 
-library(ggpubr)
+
 
 ggarrange(plotlist = plotagens, ncol = 3, nrow = 2)
 
@@ -419,3 +427,70 @@ ggarrange(plotlist = plot_uni, ncol = 3, nrow = 2)
 
 
 ggarrange(plotlist = list(rm2003,rm2009,rm2018), nrow = 3)
+
+
+wafp <- function(qano,qesf,mostraleg, 
+                    tabela = estatesf_pano, 
+                    titulo = "nos gastos totais") {
+  p <- tabela %>%
+    mutate(fracao=as.numeric(fracao))%>%
+    left_join(dicfracoes)%>%
+    filter(esfera == qesf & ano == qano)%>%
+    arrange(desc(nomefracao))%>%
+    mutate(partic=partic)%>%
+    rename(`Fração de Classe` = nomefracao)%>%
+    arrange(desc(partic))
+  print(summary(p$partic))
+  partic_p <- percent(sum(p$partic),accuracy = 0.1)
+  p <- ggplot(p,aes(values=partic,fill=factor(`Fração de Classe`)))+
+  geom_waffle(n_rows = 20, make_proportional = T,size = 2, colour = "white", flip = TRUE)+
+    coord_equal() +
+    theme_ipsum_rc(grid="") +
+    theme_enhance_waffle()+
+    scale_fill_brewer(palette="Dark2")+
+    theme_void()+
+    theme(legend.title = element_blank(),
+          legend.position = ifelse(mostraleg == 1,"bottom","none"))+
+    ggtitle(ifelse(mostraleg == 1, 
+                   paste("Participação de frações",
+                         titulo,"da esfera",
+                         qesf,"\n\n",
+                         qano,"\n",
+                         partic_p),
+                   paste(qano,
+                         "\n",
+                         partic_p)))+
+    theme(plot.title = element_text(hjust = 0.5),
+          text = element_text(family="Bitstream Charter"))
+    
+  p
+}
+# Pensar como adicionar novamente mais info no waffle    
+#     geom_text(aes(y = ypos, x = 1.4, label = 
+#                     percent(partic/sum(partic),accuracy = 0.1)),
+#               size = 4)+
+#     geom_text(aes(y = ypos, x = 1.1, label = paste0(
+#       "(",
+#       percent(partic,accuracy = 0.1),
+#       ")")),size = 3)+
+#     guides(fill=guide_legend(nrow=4,byrow=TRUE))+
+# } 
+
+plotagens_gw <- mapply(wafp,anosesf$qano,
+                    anosesf$qesf,
+                    anosesf$mostraleg,
+                    rep(list(estatesf_pano),6),
+                    rep("nos gastos totais",6),SIMPLIFY = F)
+
+ggarrange(plotlist = plotagens_gw, ncol = 3, nrow = 2)
+
+
+
+
+plotagens_uw <- mapply(wafp,anosesf$qano,
+                       anosesf$qesf,
+                       anosesf$mostraleg,
+                       rep(list(estatesf_puni),6),
+                       rep("no total de domicílios",6),SIMPLIFY = F)
+
+ggarrange(plotlist = plotagens_uw, ncol = 3, nrow = 2)

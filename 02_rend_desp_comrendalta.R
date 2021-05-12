@@ -34,8 +34,7 @@ rendas_classificadas2009 %<>% mutate(
     is.na(grupo_cod) ~ forma,
     !is.na(grupo_cod) & forma %in% c(5,6,7) ~ forma,
     !is.na(grupo_cod) & !(forma %in% c(5,6,7)) ~ grupo_cod)
-  )%>%
-  mutate(forma = ifelse(recmes>=4000 & forma == 1, 5, forma))
+  )
   
 
 rendas_ucs2009 <- rendas_classificadas2009 %>%
@@ -44,123 +43,64 @@ rendas_ucs2009 <- rendas_classificadas2009 %>%
   dplyr::summarise(renda = sum(recmes)) %>%
   tidyr::pivot_wider(names_from = forma, values_from = renda, 
               values_fill = list(renda = 0)) %>%
-  select(1:4,13,5,7,12,6,9,10,14,11,8)%>%
+  select(1:4,12,5,7,13,6,9,10,14,11,8,15)%>%
   mutate(cv = `1`+`2`+`3`+`4`+`9`+`12`,
-         `5` = ifelse(`5`<0 & abs(`5`)>5*cv,abs(`5`),0),
+         `5` = ifelse(`5`<0 ,ifelse(abs(`5`)>2*cv,abs(`5`),0),`5`),
          baixa = `1`+`2`+`3`+`8`+`9`+`10`+`12`,
-         mv = `5`+`6`+`7`+`8`+`10`+`11`+`13`) %>%
+         mv = `5`+`6`+`7`+`8`+`10`+`11`+`13`+`14`) %>%
   dplyr::mutate(total = cv + mv,
          p_cv = (cv + 0.00001) / (total + 0.00001),
          p_baixa = min(1,(baixa+0.00001)/(total+0.00001))
          ) %>%
+  select(sort(tidyselect::peek_vars()))%>%
+  select(c(1,7:14,2:6,15:21))%>%
   dplyr::ungroup()
 
+rendas_ucs2009$max_baixa <- apply(rendas_ucs2009[baixa],1,max)
 
-rendas_ucs2009$fracao <- sapply(max.col(rendas_ucs2009[2:14],ties.method = "last"),
-                            function (x) {as.numeric(names(rendas_ucs[2:14])[x])})
+rendas_ucs2009$max_alta <- apply(rendas_ucs2009[alta],1,max)
 
-# rendas_ucs2009 <- rendas_ucs2009 %>%
-#   mutate(rendalta = total > quantile(total,0.8, names = F))
+#rendas_ucs2009$fracao <- sapply(max.col(rendas_ucs2009[1:14],ties.method = "first"),
+ #                           function (x) {as.numeric(names(rendas_ucs2009[1:14])[x])})
+
+rendas_ucs2009$fracao <- ifelse(rendas_ucs2009$p_baixa >= corte,
+                            as.numeric(names(rendas_ucs2009[baixa])[max.col(rendas_ucs2009[baixa],ties.method = "first")]),
+                            as.numeric(names(rendas_ucs2009[alta])[max.col(rendas_ucs2009[alta],ties.method = "first")])
+)
 
 
-# # K-Means usadas para estabelecer corte alta/baixa
-# k_rendas <- kmeans(rendas_ucs2009$p_cv, c(0.2, 0.5))
-# k_rendas$centers
-# 
-# ggplot(rendas_ucs2009, aes(p_cv, total, col = factor(k_rendas$cluster))) +
-#   geom_point(shape = ".", alpha = 0.5) +
-#   geom_vline(xintercept = 0.6, lty = 2) +
-#   scale_y_continuous(limits = c(0, 20e3)) +
-#   theme_classic() +
-#   theme(legend.position = "none")
+rendas_ucs2009%<>%mutate(fracao = ifelse(total<=0.75*465,9,fracao),
+                         fracao = ifelse(fracao == 3, 2, fracao))
 
-# A análise acima propor o corte de 63% para esfera alta/baixa
-corte <- 0.5
+rendas_ucs2009 <- separalbx(tabela=rendas_ucs2009,gr=10)
 
-# Etapa 3 -----------------------------------------------------------
-rendas_esferas2009 <- rendas_ucs2009 %>%
-  mutate(esfera = ifelse(p_baixa > corte, "baixa", "alta"))
+#para 10 e 11
+rendas_ucs2009 <- separalbx(tabela=rendas_ucs2009,baixa=10,alta=11)
+#para 12 e 13
 
-#para renda alta
-#rendas_esferas2009 <- rendas_ucs2009 %>%
-#  mutate(esfera = ifelse(!rendalta, "baixa", "alta"))
+rendas_ucs2009 <- separalbx(tabela=rendas_ucs2009,baixa=12,alta=13)
 
+#para 4 e 1
+rendas_ucs2009 <- separalbx(tabela=rendas_ucs2009,baixa=1,alta=4)
+
+#para 4 e 2
+rendas_ucs2009 <- separalbx(tabela=rendas_ucs2009,baixa=2,alta=4)
+
+#para 14 e 6
+rendas_ucs2009 <- separalbx(tabela=rendas_ucs2009,baixa=6,alta=14,cl=2)
+
+
+rendas_ucs2009$esfera <- ifelse(rendas_ucs2009$fracao %in% baixa,"baixa","alta")
+
+rendas_esferas2009 <- rendas_ucs2009
 ##Correção 0,2% dos mais ricos
 rendas_esferas2009 %<>%mutate(maisrico = ntile(total,1000),
        total = ifelse(maisrico>998,2*total,total))%>%
   select(-maisrico)
 
-##Correção de 5 + esfera baixa
-rendas_esferas2009 %<>% 
-  mutate(fracao = ifelse(esfera == "baixa" & fracao == 5,
-                         8,fracao),
-         ##Correção de outros "corner cases"
-         fracao = ifelse(esfera == "baixa" & total == 0 & fracao ==11,
-                         9,fracao),
-         fracao = ifelse(total <= 232, 9, fracao),
-         esfera = ifelse(total <= 232, "baixa", esfera),
-         fracao = ifelse(fracao == 9 & total >=465, 2,fracao),
-         fracao = ifelse(esfera == "alta" & fracao == 12, 13,fracao),
-         esfera = ifelse(esfera == "alta" & fracao %in% c(1,2,3,8),"baixa",esfera),
-         esfera = ifelse(esfera == "baixa" & fracao %in% c(11,6,7,13,4), "alta",
-                         esfera),
-         fracao = ifelse(fracao %in% c(3,8) & total > 6800, 5,fracao),
-         fracao = ifelse(fracao %in% c(1,2) & total > 4000, 4,fracao),
-         fracao = ifelse(fracao == 4 & total < 2500, 1, fracao ),
-         esfera = ifelse(fracao == 1, "baixa",esfera),
-         esfera = ifelse(fracao %in% c(4,5), "alta",esfera),
-         fracao = ifelse(fracao == 11 & total < 1000, 10,fracao),
-         fracao = ifelse(fracao == 10 & total > 6500, 11, fracao),
-         esfera = ifelse(fracao == 11, "alta", esfera),
-         esfera = ifelse(fracao == 10, "baixa", esfera),
-         fracao = ifelse(fracao == 5 & total < 2500, 8,fracao),
-         esfera = ifelse(fracao == 8,  "baixa",esfera),
-         fracao = ifelse(fracao == 12 & total > 5000,13,fracao),
-         esfera = ifelse(fracao == 13, "alta",esfera),
-         ##Juntar "proletário" e "assalariados comércio / finanças"
-         fracao = ifelse(fracao %in% c(2,3), 1, fracao)
-  )
-
 
 esferas_ucs2009 <- rendas_esferas2009 %>%
   select(cod_uc, esfera, p_cv,fracao,total)
-
-
-rm2009 <- ggplot(esferas_ucs2009%>%left_join(dicfracoes),aes(factor(gsub(" ","\n",nomefracao)),total,fill=esfera))+
-  geom_violin(draw_quantiles = 0.5)+
-  scale_y_log10()+
-  ggtitle("Distribuição de renda nas frações - 2009")+
-  theme_minimal()+
-  theme(axis.title.x=element_blank())
-
-
-###Vamos adicionar "poupança" por UC
-
-poupanca_ucs2009 <- rendas2009%>%filter(is.na(cod_novo))%>%
-  group_by(cod_uc)%>%
-  summarize(cod_uc=first(cod_uc),
-            poupanca=sum(-1*recmes*as.numeric(recmes<0)))
-
-poupanca_ucs2009 <- poupanca_ucs2009%>%
-  full_join(despesas_esferas2009%>%left_join(pesos2009)%>%filter(grepl("^47",codigo))%>%group_by(cod_uc)%>%summarize(imovel=sum(valor/peso_final)))
-
-poupanca_ucs2009[is.na(poupanca_ucs2009)] <-  0
-
-poupanca_ucs2009$poupanca <- poupanca_ucs2009$poupanca+poupanca_ucs2009$imovel
-
-poupanca_ucs2009 <- poupanca_ucs2009 %>% select(-imovel)
-
-
-
-esferas_ucs2009 <- esferas_ucs2009%>%left_join(poupanca_ucs2009)
-
-esferas_ucs2009[is.na(esferas_ucs2009$poupanca),"poupanca"] <- 0
-
-ep2009 <- esferas_ucs2009%>% mutate(poupa=poupanca/(total+0.00001))%>%
-  left_join(dicfracoes)%>%left_join(pesos2009)
-
-ep2009%>%group_by(esfera,fracao)%>%summarize(poupanca_media=weighted.mean(poupa,peso_final))%>%left_join(dicfracoes)%>%mutate(poupanca_media = ifelse(fracao == 9,0,percent(poupanca_media,accuracy = 0.1)))%>%select(esfera,nomefracao,poupanca_media)
-
 
 
 
@@ -173,60 +113,48 @@ despesas_esferas2009 <- ler_despesas2009() %>%
   # select(cod_uc, codigo, nivel_0:esfera)
   rename(valor = despmes)
 
-# Estimativa geral esferas
-t09 <- despesas_esferas2009 %>%
-  group_by(esfera,fracao) %>%
-  summarise(soma = sum(valor) * 12 / 1e6) %>% # Em bilhões
-  filter(!is.na(esfera)) %>% 
-  mutate(partic = soma / sum(soma))
-
-t09$partic_total <- t09$soma/sum(t09$soma)
-t09  <- t09 %>% left_join(dicfracoes) %>% select(-fracao,-partic)
-
-# 
-# despesas_esferas2009 %>% 
-#   mutate(ano = 2009) %>% 
-#   write_csv("gastos_esferas_2009.csv")
 
 despesas_esferas2009 %>% 
   mutate(ano = 2009) %>%
-  write_csv("gastos_esferas_2009_fracoes.csv")
+  write_csv("gastos_esferas_fracoes_2009.csv")
 
-gastos2009 <- despesas_esferas2009%>%
-  filter(!is.na(cod_uc))%>%left_join(pesos2009)
+###Vamos adicionar "poupança" por UC
 
-g09 <- gastos2009%>%
-  mutate(esfera = ifelse(is.na(esfera),"baixa",esfera))%>%
+poupanca_ucs2009 <- rendas2009%>%filter(is.na(cod_novo))%>%
   group_by(cod_uc)%>%
-  summarise(massa=sum(valor)*12/1e9,
-            peso_final = first(peso_final),
-            esfera = first(esfera),
-            fracao = first(fracao),
-            renda = first(total))%>%
-  mutate(maisrico = ntile(massa,1000),
-         massa = ifelse(maisrico>998,massa*2,massa))%>%
-  mutate(fracao=ifelse(is.na(fracao),1,fracao))%>%
-  group_by(esfera,fracao)%>%
-  summarize(domicilios=sum(peso_final),
-            massa_valor = sum(massa*peso_final),
-            renda_total = sum(renda*peso_final)*12/1e9,
-            renda_media = weighted.mean(renda,peso_final),
-            media_gastos = weighted.mean(massa,peso_final)*1e9/12)%>%
-  left_join(dicfracoes)
+  summarize(cod_uc=first(cod_uc),
+            poupanca=sum(-1*recmes*as.numeric(recmes<0)))
 
-g09$participacao <- g09$massa_valor/sum(g09$massa_valor)
-g09$prenda <- g09$renda_total/sum(g09$renda_total,na.rm = T)
+poupanca_ucs2009 <- poupanca_ucs2009%>%
+  full_join(despesas_esferas2009%>%left_join(pesos2009)%>%filter(grepl("^47",codigo))%>%
+              group_by(cod_uc)%>%summarize(imovel=sum(valor/peso_final)))
 
-g09 %>% group_by(esfera)%>% summarize(participacao=sum(participacao))
 
-gh09 <- gastos2009%>%
-  mutate(esfera=ifelse(is.na(esfera),"baixa",esfera))%>%
-  group_by(cod_uc)%>%
-  summarize(massa=sum(valor),
-            peso_final=first(peso_final),
-            esfera= first(esfera),
-            fracao= first(fracao)) %>%
-  mutate(maisrico = ntile(massa,1000),
-         massa = ifelse(maisrico>998,massa*2,massa))%>%
-  mutate(fracao=ifelse(is.na(fracao),1,fracao))%>%
-  left_join(dicfracoes)
+
+poupanca_ucs2009$poupanca <- poupanca_ucs2009$poupanca+poupanca_ucs2009$imovel
+
+poupanca_ucs2009 <- poupanca_ucs2009 %>% select(-imovel)
+
+poupanca_ucs2009[is.na(poupanca_ucs2009)] <-  0
+
+esferas_ucs2009 <- esferas_ucs2009%>%left_join(poupanca_ucs2009)
+
+esferas_ucs2009[is.na(esferas_ucs2009$poupanca),"poupanca"] <- 0
+
+ep2009 <- esferas_ucs2009%>% mutate(poupa=poupanca/(total+0.00001))%>%
+  left_join(dicfracoes)%>%left_join(pesos2009)
+
+ep2009%>%group_by(esfera,fracao)%>%summarize(poupanca_media=weighted.mean(poupa,peso_final))%>%left_join(dicfracoes)%>%mutate(poupanca_media = ifelse(fracao == 9,0,percent(poupanca_media,accuracy = 0.1)))%>%select(esfera,nomefracao,poupanca_media)
+
+
+
+rm2009 <- ggplot(esferas_ucs2009%>%left_join(dicfracoes),aes(factor(gsub(" ","\n",nomefracao)),total,fill=esfera))+
+  geom_violin(draw_quantiles = 0.5)+
+  scale_y_log10(labels = comma_format(big.mark = ".",
+                                      decimal.mark = ","))+
+  xlim(l[8],l[1],l[2],l[3],l[10],l[9],l[4],l[14],l[11],l[6],l[13],l[5],l[12])+
+  stat_summary(fun = mean, geom = "point", shape = 23, size = 2)+
+  ggtitle("Distribuição de renda nas frações - 2009")+
+  theme_minimal()+
+  theme(axis.title.x=element_blank())
+

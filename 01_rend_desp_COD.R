@@ -20,7 +20,7 @@ library(tidyverse)
 # dir(glue::glue("dados/2018/Arquivos de dados"), 
 #     full.names = TRUE) %>% 
 #   file.rename(str_remove(., "Arquivos de dados/"))
-
+source("00_funcoes.R")
 # Etapa 1 -----------------------------------------------------------
 rendas2018 <- ler_rendimentos2018()
 
@@ -63,15 +63,16 @@ teste2 %>%
   scale_x_log10()
 
 # Etapa 2 -----------------------------------------------------------
-rendas_classificadas <- classificar_rendimentos(rendas2018)
+rendas_classificadas <- classificar_rendimentos(rendas2018,cod = T)
+names(rendas_classificadas)[18] <- "forma"
 
 rendas_ucs <- rendas_classificadas %>%
   group_by(cod_uc, forma) %>%
   summarise(renda = sum(valor_mensal)) %>%
   pivot_wider(names_from = forma, values_from = renda, 
               values_fill = list(renda = 0)) %>%
-  mutate(total = cv + mv,
-         p_cv = cv/total) %>%
+  mutate(total = alta + baixa,
+         p_cv = case_when(total == 0 ~ 1,total > 0 ~ baixa/total)) %>%
   ungroup()
 
 # K-Means usadas para estabelecer corte alta/baixa

@@ -4,15 +4,6 @@ subst_na <-  function(x) {
   x
 }
 
-juntacod <- function(x,ocupacol){
-  require(tidyverse)
-  source("00_funcoes_COD.R")
-  
-  dicod <- preparadicod()
-  x <- x %>%  left_join(dicod, 
-                        by = setNames("Grupo de base",ocupacol))
-}
-
 # ----- POF 2003 --------------------------------------------------------------
 ler_rendimentos2003 <- function() {
   nomes <- c("rendimentos", "outros_reci")
@@ -67,7 +58,7 @@ ler_rendimentos2003 <- function() {
   bind_rows(t_rendimentos_recoded, t_outros_reci_recoded)
 }
 
-classificar_rendimentos2003 <- function(df,cod = F) {
+classificar_rendimentos2003 <- function(df) {
   # morador <- readRDS("dados/2003/t_morador.rds") %>% 
   #   as_tibble()
   # 
@@ -99,7 +90,7 @@ classificar_rendimentos2003 <- function(df,cod = F) {
   #   dplyr::summarise(recmes = sum(recmes))
   
   # domicilios_porcodigo_agregados %>%
-  df <- df %>% 
+  df %>% 
     dplyr::mutate(nivel = stringr::str_remove_all(cod_novo, "\\.") %>% 
                     as.numeric() ) %>% 
     dplyr::filter(!is.na(nivel)) %>% 
@@ -143,9 +134,6 @@ classificar_rendimentos2003 <- function(df,cod = F) {
     forma = ifelse(forma != "emp", forma, 
                    ifelse(recmes > 4500, "mv", "cv"))
     )
-  if (cod == T){
-    df <- juntacod(df,"c_ocupacao")
-  }
 }
 
 ler_despesas2003 <- function() {
@@ -275,7 +263,7 @@ ler_rendimentos2009 <- function() {
 }
 
 
-classificar_rendimentos2009 <- function(df, cod = F) {
+classificar_rendimentos2009 <- function(df) {
   
   # morador <- readRDS("dados/2009/Dados/t_morador_s.rds") %>% 
   #   tibble::as_tibble()
@@ -304,7 +292,7 @@ classificar_rendimentos2009 <- function(df, cod = F) {
   # 
   # domicilios_porcodigo_agregados %>%
   # dplyr::mutate(forma = dplyr::case_when(
-  df <- df %>% 
+  df %>% 
     dplyr::rename(nivel = cod_novo) %>% 
     dplyr::filter(!is.na(nivel)) %>% 
     dplyr::mutate(
@@ -350,12 +338,6 @@ classificar_rendimentos2009 <- function(df, cod = F) {
                    ifelse(recmes > 5000, "mv", "cv"))
     )
 
-  
-  
-  if (cod == T){
-    df$cod_ocup_final <- as.numeric(df$cod_ocup_final)
-    df <- juntacod(df,"cod_ocup_final")
-  }
   # renda_m_total <- domicilios_porcodigo_agregados %>% 
   #   dplyr::group_by(cod_uc) %>%
   #   dplyr::summarise(cod_novo = 1,
@@ -517,16 +499,14 @@ ler_rendimentos2018 <- function() {
 
 classificar_rendimentos <- function(df, cod = F) {
 
-    
+    junta_rendas <- df %>%
     # Os casos que caem com o filtro abaixo são movimentações 
     # financeiras que não sao renda
     # deposito de poupança, compra de ações, etc...
-    junta_rendas <- df %>%  
     filter(!is.na(nivel)) 
-#    if(cod == F) { 
+    if(cod == F) { 
       junta_rendas <- junta_rendas %>%
     mutate(forma = case_when(
-      is.na(nivel) ~ "mv",
       # rendimento de empregado baseado no vínculo
       nivel == 111 & v5302 == 1 ~ "cv",
       nivel == 111 & v5302 == 2 ~ "mv",
@@ -571,8 +551,7 @@ classificar_rendimentos <- function(df, cod = F) {
   
   # algo semelhante pode ser feito para rendas dos empresários
   # para eliminar MEIs que contratam 1 pessoa
-
-  junta_rendas <- junta_rendas %>%
+  junta_rendas %>%
     mutate(forma = ifelse(forma != "cp", forma,
                           # valor usado vem do gráfico acima
                           ifelse(valor_mensal > 6000, "mv", "cv")),
@@ -604,11 +583,11 @@ classificar_rendimentos <- function(df, cod = F) {
   # forma = ifelse(forma != "cp", forma, 
   #                ifelse(valor_mensal > 6000, "mv", "cv"))
   # )
- # } else {
-  if (cod == T) {
-   junta_rendas <- juntacod(junta_rendas,"v53011")
+  } else {
+    source("00_funcoes_COD.R")
+    dicod <- preparadicod()
+    junta_rendas <- junta_rendas %>%  left_join(dicod, by = c("v53011" = "Grupo de base"))
   }
-#  }
 }
 
 ler_despesas2018 <- function() {
