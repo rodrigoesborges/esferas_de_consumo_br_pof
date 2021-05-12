@@ -4,10 +4,10 @@ require(magrittr)
 require(dplyr)
 require(readxl)
 
-preparadicod <- function(arq = "sourcedata/Ocupação COD-esferas.xlsx"){
+preparadicod <- function(ano, pasta = "sourcedata"){
   require(magrittr)
   require(dplyr)
-  
+  arq <- paste0(pasta,"Ocupação COD-esferas",ano,".xlsx")
   dictionary <- readxl::read_excel(arq)
   colnames(dictionary) <- paste0("X__",1:dim(dictionary)[2])
   dictionary %<>% subset(!is.na(X__4)) %>% select(-1:-3, -6)
