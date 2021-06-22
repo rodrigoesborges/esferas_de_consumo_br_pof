@@ -95,7 +95,7 @@ gastos_SCN2009$ano <- 2009
 tradutor2018 <- tradutor2009
 
 #merge dos gastos
-gastos_SCN2018 <- left_join(gastos_expandidos%>%filter(ano==2009), tradutor2018)
+gastos_SCN2018 <- left_join(gastos_expandidos%>%filter(ano==2018), tradutor2018)
 
 gastos_SCN2018 <- gastos_SCN2018[complete.cases(gastos_SCN2018),]
 

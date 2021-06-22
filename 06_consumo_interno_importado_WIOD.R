@@ -41,7 +41,9 @@ consumos$IndustryCode <- substr(consumos$IndustryCode,1,3)
 tradisic <- read_xls("sourcedata/tradutores/CNAE20_Correspondencia_Cnae20xIsic4.xls",skip=3)[-1,-4]
 names(tradisic) <- c("cnae2","desc_cnae","isic4","desc_isic","obs")
 
-tradisic <- tradisic %>%mutate(isicsec = ifelse(is.na(as.numeric(isic4)),isic4,""))
+tradisic <- tradisic %>%mutate(cnaeag = ifelse(is.na(as.numeric(cnae2)),cnae2,""),
+  isicsec = ifelse(is.na(as.numeric(isic4)),isic4,""),
+                               )
 
 
 for (i in 1:nrow(tradisic)) {
@@ -51,7 +53,7 @@ for (i in 1:nrow(tradisic)) {
   }
   if(tradisic[i,"isic4"] != tradisic[i,c]) {
   tradisic[i,"isic4"] <- paste0(tradisic[i,c],tradisic[i,"isic4"])
-  tradisic[i,"cnae2"] <- paste0(tradisic[i,c],tradisic[i,"cnae2"])
+  tradisic[i,"cnaeag"] <- paste0(tradisic[i,c],tradisic[i,"cnae2"])
   }
 }
 
@@ -63,10 +65,16 @@ tradisicrs <- tradisic[nchar(tradisic$isic4)< 4,]
 consumos <- consumos%>%left_join(tradisicrs,by = c("IndustryCode"= "isic4"))
 
 
+unique(consumos$cnae2)
 
 
 
 
 
-
-
+gastos_SCN %>% 
+  group_by(ano, esfera, cod68, item68x20) %>% 
+  summarise(valor = sum(valor * peso)/10^6) %>% 
+  pivot_wider(names_from = esfera, values_from = valor) %>% 
+  mutate(prop = alta / (alta + baixa)) %>% 
+  split(.$ano) %>% 
+  map(arrange, desc(prop))
