@@ -6,8 +6,10 @@
 #acerta codificação para o restante do script
 options( encoding = "utf8" )	
 # Tabela de componentes hierarquizada cod68 x cod 20 - dicionário de tradução agregado
-componentes <- read.csv("sourcedata/tradutores/cod68X20componentes-HIERARQ.csv", 
-                        colClasses = c("item68x20" = "character","cod68" = "character"), fileEncoding = "utf-8")
+componentes <- read.csv("sourcedata/tradutores/cod68X20componentes-HIERARQ-e-isic-paraimportacao.csv", 
+                        colClasses = c("item68x20" = "character",
+                        "cod68" = "character","isic_prop_M"="character","isic_prop_M2"="character",
+                        "isic_prop_M3"="character"), fileEncoding = "utf-8")
 
 # Carrega tabela com códigos POF que não entram inicialmente como Consumo Final das Famílias
 # Nomeadamente para 2009 (e 2018)
@@ -26,7 +28,7 @@ names(pofnaoconsumo) <- c("codigo","Descrição POF",
                           "Produto Contas Nacionais", "Descrição Contas Nacionais")
 
 #junta códigos ficticios para FBKX e Imposto na tabela componentes
-fbkf.tax <- data.frame(c("9800","9900"),c("U","V"),c("Impostos","FBKF"),c("4","5"), stringsAsFactors = FALSE)
+fbkf.tax <- data.frame(c("9800","9900"),c("U","V"),c("Impostos","FBKF"),c("4","5"),c("999","999"),c("",""),c("",""), stringsAsFactors = FALSE)
 names(fbkf.tax) <- names(componentes)
 componentes <- rbind(componentes, fbkf.tax)
 
@@ -45,7 +47,8 @@ tradutor2003 <- tradutor2003[!duplicated(tradutor2003$codigo),]
 
 ##################
 #tradutor para nível hierarquizado compatível com nível 68 SCN e nível 20 (ISIC v4)
-trad.agregado <- componentes
+trad.agregado <- componentes%>%select(-"isic_prop_M2",-"isic_prop_M3")
+
 trad.agregado[trad.agregado==""] <- NA
 trad.agregado <- trad.agregado[complete.cases(trad.agregado),c(1,4)]
 
@@ -108,4 +111,5 @@ gastos_SCN2018$ano <- 2018
 
 
 gastos_SCN <- bind_rows(gastos_SCN2003,gastos_SCN2009,gastos_SCN2018)
+
 
