@@ -50,7 +50,7 @@ tradutor2003 <- tradutor2003[!duplicated(tradutor2003$codigo),]
 trad.agregado <- componentes%>%select(-"isic_prop_M2",-"isic_prop_M3")
 
 trad.agregado[trad.agregado==""] <- NA
-trad.agregado <- trad.agregado[complete.cases(trad.agregado),c(1,4)]
+trad.agregado <- trad.agregado[complete.cases(trad.agregado),c(1,5)]
 
 #merge dos gastos
 gastos_SCN2003 <- left_join(gastos_expandidos%>%filter(ano==2003), tradutor2003)

@@ -3,8 +3,9 @@ library(data.table)
 
 
 consumobr <- function(ano = 2003, pasta = "sourcedata/wiots/") {
-  if (ano > 2014) {ano <- 2018}
-  fonte <- paste0(pasta,"WIOT",ano,"_October16_ROW.rds")
+  if (ano > 2014) { fonte <- paste0(pasta,"WIOT2014_October16_ROW.rds")}
+  else {fonte <- paste0(pasta,"WIOT",ano,"_October16_ROW.rds")}
+  
 
 consumofam2003 <- readRDS(fonte)
 
@@ -38,13 +39,13 @@ consumos$IndustryCode <- substr(consumos$IndustryCode,1,3)
 
 
 
+consumos$traded <- consumos$importado >= 0.1
 
 
 
 
 
-
-
+write_csv2(consumos,"dados/proporcao-consumo-importado-geral-wiod-2003-2009-2014-8.csv")
 
 
 
