@@ -11,7 +11,6 @@ gastos_SCN_m <- gastos_SCN%>%filter(isic_prop_M!=999)%>%
 esferas_nos_n_traded <- gastos_SCN_m%>%group_by(ano,traded,esfera)%>%summarize(importado=sum(valor*peso_final*importado),
                                                        interno=sum(valor*peso_final*interno))
 
-
 enntm <- esferas_nos_n_traded%>%select(-interno)%>%pivot_wider(names_from=esfera,values_from=importado)
 
 enntm[3:4] <- prop.table(as.matrix(enntm[3:4]),1)
@@ -73,3 +72,14 @@ prop_gastos_set <- gastos_setoriais_t%>%filter(indicador=="prop"& !(cod68 %in% c
   pivot_wider(names_from=ano, values_from=valor,values_fn = {first})%>%arrange(contas)
 
 write_ods(prop_gastos_set,"resultados/proporcoes_setoriais.ods")
+
+
+##Completo com interno e importado
+
+setesfimp <- gastos_SCN_m%>%group_by(ano,`Descrição Contas`,esfera)%>%summarize(importado=sum(valor*peso_final*importado),
+                                                                                                interno=sum(valor*peso_final*interno))
+setesfimp %<>%pivot_longer(-(1:3),names_to="origem",values_to="valor")
+
+setesfimp <- setesfimp%>%transmute(ano,`Descrição Contas`,esfera=paste(esfera,"-",origem),valor)%>%pivot_wider(names_from=esfera,values_from=valor)
+
+write_ods(setesfimp,"resultados/interno-importado-setores-esfera.ods")
